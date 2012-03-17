@@ -50,7 +50,6 @@ class Subreddit(db.Model):
     last_submission = db.Column(db.DateTime, nullable=False)
     last_spam = db.Column(db.DateTime, nullable=False)
     last_comment = db.Column(db.DateTime, nullable=False)
-    report_threshold = db.Column(db.Integer)
     auto_reapprove = db.Column(db.Boolean, nullable=False, default=False)
     check_all_conditions = db.Column(db.Boolean, nullable=False, default=False)
     reported_comments_only = db.Column(db.Boolean, nullable=False,
@@ -66,6 +65,10 @@ class Condition(db.Model):
     value - A regex checked against the attribute. Automatically surrounded
         by ^ and $ when checked, so looks for "whole string" matches. To
         do a "contains" check, put .* on each end
+    num_reports - The number of reports the item has. Note that setting to
+        None means a matching item *must* have 0 reports.
+    auto_reapproving - Whether the num_reports condition should apply only
+        during auto-reapproving, only before, or both (if null)
     is_gold - Whether the author has reddit gold or not
     is_shadowbanned - Whether the author is "shadowbanned" or not
     account_age - Account age condition (in days) for the item's author
@@ -78,8 +81,11 @@ class Condition(db.Model):
         is a top-level condition, will be null
     action - Which action to perform if this condition is matched
     spam - Whether to train the spam filter if this is a removal
-    comment - If set, bot will post (and distinguish) this comment when an
-        action is performed due to this condition
+    comment_method - What method the bot should use to deliver its comment
+        when this condition is matched - reply to the item itself, send
+        a PM to the item's author, or modmail to the subreddit
+    comment - If set, bot will post this comment using the defined method
+        when this condition is matched
     notes - not used by bot, space to keep notes on a condition
 
     """
@@ -106,6 +112,8 @@ class Condition(db.Model):
                                   name='condition_attribute'),
                           nullable=False)
     value = db.Column(db.Text, nullable=False)
+    num_reports = db.Column(db.Integer)
+    auto_reapproving = db.Column(db.Boolean, default=False)
     is_gold = db.Column(db.Boolean)
     is_shadowbanned = db.Column(db.Boolean)
     account_age = db.Column(db.Integer)
@@ -119,6 +127,10 @@ class Condition(db.Model):
                                'alert',
                                name='action'))
     spam = db.Column(db.Boolean)
+    comment_method = db.Column(db.Enum('comment',
+                                       'message',
+                                       'modmail'),
+                                       name='comment_method')
     comment = db.Column(db.Text)
     notes = db.Column(db.Text)
 

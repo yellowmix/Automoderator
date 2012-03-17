@@ -16,71 +16,92 @@ from models import cfg_file, path_to_cfg, db, Subreddit, Condition, \
 # global reddit session
 r = None
 
-# don't remove/approve any reports older than this (doesn't apply to alerts)
+# don't action any reports older than this
 REPORT_BACKLOG_LIMIT = timedelta(days=2)
 
 
 def perform_action(subreddit, item, condition):
-    """Performs the action for the condition(s) and creates an ActionLog entry."""
+    """Performs the action for the condition(s).
+    
+    Also delivers the comment (if set) and creates an ActionLog entry.
+    """
+    
     global r
+    disclaimer = ('\n\n*I am a bot, and this action was performed '
+                    'automatically. Please [contact the moderators of this '
+                    'subreddit](http://www.reddit.com/message/compose?'
+                    'to=%23'+item.subreddit.display_name+') if you have any '
+                    'questions or concerns.*')
 
-    # post the comment if one is set
+    # build the comment if multiple conditions were matched
     if isinstance(condition, list):
         if any([c.comment for c in condition]):
-            comment = ('This has been '+condition[0].action+'d for the '
-                       'following reasons:\n\n')
+            if condition[0].action == 'alert':
+                verb = 'alerted'
+            else:
+                verb = condition[0].action+'d'
+
+            comment = ('This has been '+verb+' for the following reasons:\n\n')
             for c in condition:
                 if c.comment:
                     comment += '* '+c.comment+'\n'
             post_comment(item, comment)
 
-        # bit of a hack and only logs first action matched
-        # should find a better method
+        # bit of a hack and only logs and uses attributes from first
+        # condition matched, should find a better method
         condition = condition[0]
-    elif condition.comment:
-        post_comment(item, condition.comment)
+    else:
+        comment = condition.comment
+
+    # abort if it's an alert and we've already alerted on this item
+    if condition.action == 'alert':
+        try:
+            ActionLog.query.filter(
+                and_(ActionLog.permalink == get_permalink(item),
+                     ActionLog.action == 'alert')).one()
+            return
+        except NoResultFound:
+            pass
 
     # perform the action
     if condition.action == 'remove':
         item.remove(condition.spam)
     elif condition.action == 'approve':
         item.approve()
-    elif condition.action == 'alert':
-        r.compose_message(
-            '#'+subreddit.name,
-            'Reported Item Alert',
-            'The following item has received a large number of reports, '+
-            'please investigate:\n\n'+item)
+
+    # deliver the comment if set
+    if comment:
+        if condition.comment_method == 'comment':
+            post_comment(item, comment+disclaimer)
+        elif condition.comment_method == 'modmail':
+            r.compose_message('#'+subreddit.name,
+                              'AutoModerator condition matched',
+                              get_permalink(item)+'\n\n'+comment)
+        elif condition.comment_method == 'message':
+            r.compose_message(item.author.name,
+                              'AutoModerator condition matched',
+                              get_permalink(item)+'\n\n'+comment+disclaimer)
 
     # log the action taken
     action_log = ActionLog()
     action_log.subreddit_id = subreddit.id
+    action_log.user = item.author.name
+    action_log.permalink = get_permalink(item)
+    action_log.created_utc = datetime.utcfromtimestamp(item.created_utc)
     action_log.action_time = datetime.utcnow()
     action_log.action = condition.action
-
-    if isinstance(item, str) or isinstance(item, unicode):
-        # for report threshold alert, we only know permalink to item
-        action_log.permalink = item
-    else:
-        action_log.user = item.author.name
-        action_log.created_utc = datetime.utcfromtimestamp(item.created_utc)
-        action_log.matched_condition = condition.id
+    action_log.matched_condition = condition.id
 
     if isinstance(item, reddit.objects.Submission):
         action_log.title = item.title
-        action_log.permalink = item.permalink
         action_log.url = item.url
         action_log.domain = item.domain
-        logging.info('  /r/%s: %sd submission "%s"',
+        logging.info('  /r/%s: %s submission "%s"',
                         subreddit.name,
                         condition.action,
                         item.title.encode('ascii', 'ignore'))
     elif isinstance(item, reddit.objects.Comment):
-        action_log.permalink = ('http://www.reddit.com/r/'+
-                                item.subreddit.display_name+
-                                '/comments/'+item.link_id.split('_')[1]+
-                                '/a/'+item.id)
-        logging.info('        %sd comment by user %s',
+        logging.info('        %s comment by user %s',
                         condition.action,
                         item.author.name)
 
@@ -89,106 +110,13 @@ def perform_action(subreddit, item, condition):
 
 
 def post_comment(item, comment):
-    """Posts a distinguished comment as a reply to an item.
-
-    Currently only supports this for submissions.
-    """
-    disclaimer = ('\n\n*I am a bot, and this action was performed '
-                    'automatically. Please [contact the moderators of this '
-                    'subreddit](http://www.reddit.com/message/compose?'
-                    'to=%23'+item.subreddit.display_name+') if you have any '
-                    'questions or concerns.*')
+    """Posts a distinguished comment as a reply to an item."""
     if isinstance(item, reddit.objects.Submission):
-        response = item.add_comment(comment+disclaimer)
+        response = item.add_comment(comment)
         response.distinguish()
-
-
-def check_reports_html(sr_dict):
-    """Does report alerts/reapprovals, requires loading HTML page."""
-    global r
-
-    logging.info('Checking reports html page')
-    reports_page = r._request('http://www.reddit.com/r/mod/about/reports')
-    soup = BeautifulSoup(reports_page)
-
-    # check for report alerts
-    for reported_item in soup.findAll(
-            attrs={'class': 'rounded reported-stamp stamp'}):
-        permalink = (reported_item.parent
-                     .findAll('li', attrs={'class': 'first'})[0].a['href'])
-        sub_name = re.search('^http://www.reddit.com/r/([^/]+)',
-                    permalink).group(1).lower()
-        try:
-            subreddit = sr_dict[sub_name]
-        except KeyError:
-            continue
-
-        if not subreddit.report_threshold:
-            continue
-
-        reports = re.search('(\d+)$', reported_item.text).group(1)
-        if int(reports) >= subreddit.report_threshold:
-            try:
-                # check log to see if this item has already had an alert
-                ActionLog.query.filter(
-                    and_(ActionLog.subreddit_id == subreddit.id,
-                         ActionLog.permalink == permalink,
-                         ActionLog.action == 'alert')).one()
-            except NoResultFound:
-                c = Condition()
-                c.action = 'alert'
-                perform_action(subreddit, permalink, c)
-
-    # do auto-reapprovals
-    for approved_item in soup.findAll(
-            attrs={'class': 'approval-checkmark'}):
-        report_stamp = approved_item.parent.parent.findAll(
-                        attrs={'class': 'rounded reported-stamp stamp'})[0]
-
-        permalink = (report_stamp.parent
-                     .findAll('li', attrs={'class': 'first'})[0].a['href'])
-        sub_name = re.search('^http://www.reddit.com/r/([^/]+)',
-                    permalink).group(1).lower()
-        try:
-            subreddit = sr_dict[sub_name]
-        except KeyError:
-            continue
-
-        if not subreddit.auto_reapprove:
-            continue
-
-        num_reports = re.search('(\d+)$', report_stamp.text).group(1)
-        num_reports = int(num_reports)
-
-        try:
-            # see if this item has already been auto-reapproved
-            entry = (AutoReapproval.query.filter(
-                        and_(AutoReapproval.subreddit_id == subreddit.id,
-                             AutoReapproval.permalink == permalink))
-                        .one())
-            in_db = True
-        except NoResultFound:
-            entry = AutoReapproval()
-            entry.subreddit_id = subreddit.id
-            entry.permalink = permalink
-            entry.original_approver = (re.search('approved by (.+)$',
-                                                 approved_item['title'])
-                                       .group(1))
-            entry.total_reports = 0
-            entry.first_approval_time = datetime.utcnow()
-            in_db = False
-
-        if (in_db or
-                approved_item['title'].lower() != \
-                'approved by '+cfg_file.get('reddit', 'username').lower()):
-            sub = r.get_submission(permalink)
-            sub.approve()
-            entry.total_reports += num_reports
-            entry.last_approval_time = datetime.utcnow()
-
-            db.session.add(entry)
-            db.session.commit()
-            logging.info('    Re-approved %s', entry.permalink)
+    elif isinstance(item, reddit.objects.Comment):
+        response = item.reply(comment)
+        response.distinguish()
 
 
 def check_items(name, items, sr_dict, stop_time):
@@ -219,18 +147,55 @@ def check_items(name, items, sr_dict, stop_time):
                             .all())
             conditions = filter_conditions(name, conditions)
 
-            if name != 'spam' or in_modqueue(item):
-                if not check_conditions(subreddit, item,
-                        [c for c in conditions if c.action == 'remove']):
-                    check_conditions(subreddit, item,
-                            [c for c in conditions if c.action == 'approve'])
-                    
             item_count += 1
 
             if subreddit.name not in seen_subs:
                 setattr(subreddit, 'last_'+name, item_time)
                 seen_subs.add(subreddit.name)
 
+            # check removal conditions
+            if check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'remove']):
+                continue
+
+            # check approval conditions
+            if check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'approve']):
+                continue
+
+            # check alert conditions
+            if check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'alert']):
+                continue
+
+            # if doing reports, check auto-reapproval if enabled
+            if (name == 'report' and subreddit.auto_reapprove and
+                    item.approved_by is not None):
+                try:
+                    # see if this item has already been auto-reapproved
+                    entry = (AutoReapproval.query.filter(
+                            AutoReapproval.permalink == get_permalink(item))
+                            .one())
+                    in_db = True
+                except NoResultFound:
+                    entry = AutoReapproval()
+                    entry.subreddit_id = subreddit.id
+                    entry.permalink = get_permalink(item)
+                    entry.original_approver = item.approved_by
+                    entry.total_reports = 0
+                    entry.first_approval_time = datetime.utcnow()
+                    in_db = False
+
+                if (in_db or item.approved_by !=
+                        cfg_file.get('reddit', 'username')):
+                    item.approve()
+                    entry.total_reports += num_reports
+                    entry.last_approval_time = datetime.utcnow()
+
+                    db.session.add(entry)
+                    db.session.commit()
+                    logging.info('    Re-approved %s', entry.permalink)
+                            
         db.session.commit()
     except Exception as e:
         logging.error('  ERROR: %s', e)
@@ -244,16 +209,16 @@ def check_items(name, items, sr_dict, stop_time):
 def filter_conditions(name, conditions):
     """Filters a list of conditions based on the queue's needs."""
     if name == 'spam':
-        return conditions
+        return [c for c in conditions if c.num_reports == None]
     elif name == 'report':
-        return [c for c in conditions if c.subject == 'comment' and
+        return [c for c in conditions if c.num_reports is not None and
                 c.is_shadowbanned != True]
     elif name == 'submission':
-        return [c for c in conditions if c.action == 'remove' and
-                c.is_shadowbanned != True]
+        return [c for c in conditions if c.action != 'approve' and
+                c.num_reports == None and c.is_shadowbanned != True]
     elif name == 'comment':
-        return [c for c in conditions if c.action == 'remove' and
-                c.is_shadowbanned != True]
+        return [c for c in conditions if c.action != 'approve' and
+                c.num_reports == None and c.is_shadowbanned != True]
 
 
 def check_conditions(subreddit, item, conditions):
@@ -303,6 +268,7 @@ def check_condition(item, condition):
     Returns True if it matches, or False if not
     """
     start_time = time()
+
     if condition.attribute == 'user':
         if item.author:
             test_string = item.author.name
@@ -350,6 +316,25 @@ def check_condition(item, condition):
     # flip the result it's an inverse condition
     if condition.inverse:
         satisfied = not satisfied
+
+    # check number of reports if necessary
+    if satisfied and condition.num_reports is not None:
+        if condition.auto_reapproving != False:
+            # get number of reports already cleared
+            try:
+                entry = (AutoReapproval.query.filter(
+                         AutoReapproval.permalink == get_permalink(item))
+                        .one())
+                previous_reports = entry.total_reports
+            except NoResultFound:
+                previous_reports = 0
+            total_reports = item.num_reports + previous_reports
+        else:
+            total_reports = item.num_reports
+
+        satisfied = (total_reports >= condition.num_reports)
+    elif satisfied and condition.num_reports is None:
+        satisfied = (item.num_reports == 0)
 
     # check user conditions if necessary
     if satisfied:
@@ -433,31 +418,17 @@ def check_user_conditions(item, condition):
 
     # user passed all checks
     return not fail_result
-    
 
-def in_modqueue(item):
-    """Checks if an item is in the modqueue (hasn't been acted on yet)."""
-    global r
-    if not in_modqueue.modqueue:
-        mod_subreddit = r.get_subreddit('mod')
-        in_modqueue.modqueue = mod_subreddit.get_modqueue()
-        in_modqueue.cache = list()
 
-    for i in in_modqueue.cache:
-        if i.created_utc < item.created_utc:
-            return False
-        if i.id == item.id:
-            return True
-
-    for i in in_modqueue.modqueue:
-        in_modqueue.cache.append(i)
-        if i.created_utc < item.created_utc:
-            return False
-        if i.id == item.id:
-            return True
-
-    return False
-in_modqueue.modqueue = None
+def get_permalink(item):
+    """Returns the permalink for the item."""
+    if isinstance(item, reddit.objects.Submission):
+        return item.permalink
+    elif isinstance(item, reddit.objects.Comment):
+        return ('http://www.reddit.com/r/'+
+                item.subreddit.display_name+
+                '/comments/'+item.link_id.split('_')[1]+
+                '/a/'+item.id)
 
 
 def respond_to_modmail(modmail, start_time):
@@ -549,6 +520,10 @@ def condition_complexity(condition):
     """Returns a value representing how difficult a condition is to check."""
     complexity = 0
 
+    # approving or removing requires a request
+    if condition.action in ('approve', 'remove'):
+        complexity += 1
+
     # meme_name requires an external site page load
     if condition.attribute == 'meme_name':
         complexity += 1
@@ -566,9 +541,12 @@ def condition_complexity(condition):
     if condition.is_shadowbanned is not None:
         complexity += 1
 
-    # commenting+distinguishing requires 2 requests
     if condition.comment is not None:
-        complexity += 2
+        # commenting+distinguishing requires 2 requests
+        if condition.comment_method == 'comment':
+            complexity += 2
+        else:
+            complexity += 1
 
     # add complexities of all sub-conditions too
     for sub in condition.additional_conditions:
@@ -603,7 +581,7 @@ def main():
     check_items('report', items, sr_dict, stop_time)
 
     # check spam
-    items = mod_subreddit.get_spam(limit=1000)
+    items = mod_subreddit.get_modqueue(limit=1000)
     stop_time = (db.session.query(func.max(Subreddit.last_spam))
                  .filter(Subreddit.enabled == True).one()[0])
     check_items('spam', items, sr_dict, stop_time)
@@ -627,12 +605,6 @@ def main():
     # respond to modmail
     try:
         respond_to_modmail(r.user.get_modmail(), start_utc)
-    except Exception as e:
-        logging.error('  ERROR: %s', e)
-
-    # check reports html
-    try:
-        check_reports_html(sr_dict)
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
