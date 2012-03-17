@@ -189,7 +189,7 @@ def check_items(name, items, sr_dict, stop_time):
                 if (in_db or item.approved_by !=
                         cfg_file.get('reddit', 'username')):
                     item.approve()
-                    entry.total_reports += num_reports
+                    entry.total_reports += item.num_reports
                     entry.last_approval_time = datetime.utcnow()
 
                     db.session.add(entry)
