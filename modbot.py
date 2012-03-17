@@ -434,9 +434,12 @@ def get_permalink(item):
 def respond_to_modmail(modmail, start_time):
     """Responds to modmail if any submitters sent one before approval."""
     cache = list()
+    # respond to any modmail sent in the last 5 mins
+    time_window = timedelta(minutes=5)
     approvals = ActionLog.query.filter(
                     and_(ActionLog.action == 'approve',
-                         ActionLog.action_time >= start_time)).all()
+                         ActionLog.action_time >= start_time - time_window)
+                    ).all()
 
     for item in approvals:
         found = None
