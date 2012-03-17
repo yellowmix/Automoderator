@@ -96,6 +96,7 @@ class Condition(db.Model):
     subreddit_id = db.Column(db.Integer, db.ForeignKey('subreddits.id'))
     subject = db.Column(db.Enum('submission',
                                 'comment',
+                                'both',
                                 name='condition_subject'),
                         nullable=False)
     attribute = db.Column(db.Enum('user',

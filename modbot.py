@@ -230,12 +230,14 @@ def check_conditions(subreddit, item, conditions):
     """
     if isinstance(item, reddit.objects.Submission):
         conditions = [c for c in conditions
-                          if c.subject == 'submission']
+                          if c.subject == 'submission' or
+                             c.subject == 'both']
         logging.debug('      Checking submission titled "%s"',
                         item.title.encode('ascii', 'ignore'))
     elif isinstance(item, reddit.objects.Comment):
         conditions = [c for c in conditions
-                          if c.subject == 'comment']
+                          if c.subject == 'comment' or
+                             c.subject == 'both']
         logging.debug('      Checking comment by user %s',
                         item.author.name)
 
