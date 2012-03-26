@@ -130,8 +130,8 @@ class Condition(db.Model):
     spam = db.Column(db.Boolean)
     comment_method = db.Column(db.Enum('comment',
                                        'message',
-                                       'modmail'),
-                                       name='comment_method')
+                                       'modmail',
+                                       name='comment_method'))
     comment = db.Column(db.Text)
     notes = db.Column(db.Text)
 
