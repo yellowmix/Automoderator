@@ -101,7 +101,8 @@ def perform_action(subreddit, item, condition):
                         condition.action,
                         item.title.encode('ascii', 'ignore'))
     elif isinstance(item, reddit.objects.Comment):
-        logging.info('        %s comment by user %s',
+        logging.info('  /r/%s: %s comment by user %s',
+                        subreddit.name,
                         condition.action,
                         item.author.name)
 
@@ -194,7 +195,7 @@ def check_items(name, items, sr_dict, stop_time):
 
                     db.session.add(entry)
                     db.session.commit()
-                    logging.info('    Re-approved %s', entry.permalink)
+                    logging.info('  Re-approved %s', entry.permalink)
                             
         db.session.commit()
     except Exception as e:
