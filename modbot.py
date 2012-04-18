@@ -368,7 +368,8 @@ def check_user_conditions(item, condition):
             condition.link_karma is None and
             condition.comment_karma is None and
             condition.combined_karma is None and
-            condition.account_age is None):
+            condition.account_age is None and
+            condition.account_rank is None):
         return True
 
     # returning True will result in the action being performed
@@ -382,6 +383,12 @@ def check_user_conditions(item, condition):
     # if they deleted the post, fail user checks
     if not item.author:
         return fail_result
+
+    # user rank check
+    if condition.account_rank is not None:
+        if not user_has_rank(item.subreddit, item.author,
+                            condition.account_rank):
+            return fail_result
 
     # shadowbanned check
     if condition.is_shadowbanned is not None:
@@ -420,6 +427,33 @@ def check_user_conditions(item, condition):
 
     # user passed all checks
     return not fail_result
+
+
+def user_has_rank(subreddit, user, rank):
+    """Returns true if user has sufficient rank in the subreddit."""
+    sr_name = subreddit.display_name.lower()
+
+    # fetch mod/contrib lists if necessary
+    if sr_name not in user_has_rank.moderator_cache:
+        mod_list = set()
+        for mod in subreddit.get_moderators():
+            mod_list.add(mod.name)
+        user_has_rank.moderator_cache[sr_name] = mod_list
+
+        contrib_list = set()
+        for contrib in subreddit.get_contributors():
+            contrib_list.add(contrib.name)
+        user_has_rank.contributor_cache[sr_name] = contrib_list
+
+    if user.name in user_has_rank.moderator_cache[sr_name]:
+        if rank == 'moderator' or rank == 'contributor':
+            return True
+    elif user.name in user_has_rank.contributor_cache[sr_name]:
+        if rank == 'contributor':
+            return True
+    return False
+user_has_rank.moderator_cache = dict()
+user_has_rank.contributor_cache = dict()
 
 
 def get_permalink(item):

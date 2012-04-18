@@ -75,6 +75,9 @@ class Condition(db.Model):
     link_karma - Link karma condition for the item's author
     comment_karma - Comment karma condition for the item's author
     combined_karma - Combined karma condition for the item's author
+    account_rank - Whether the author is an approved submitter ("contributor")
+        or moderator in the subreddit - note that a moderator will also be
+        considered to be a contributor
     inverse - If True, result of check will be reversed. Useful for
         "anything except" or "does not include"-type checks
     parent_id - The id of the condition this is a sub-condition of. If this
@@ -121,6 +124,9 @@ class Condition(db.Model):
     link_karma = db.Column(db.Integer)
     comment_karma = db.Column(db.Integer)
     combined_karma = db.Column(db.Integer)
+    account_rank = db.Column(db.Enum('contributor',
+                                     'moderator',
+                                     name='rank'))
     inverse = db.Column(db.Boolean, nullable=False, default=False)
     parent_id = db.Column(db.Integer, db.ForeignKey('conditions.id'))
     action = db.Column(db.Enum('approve',
