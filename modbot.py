@@ -132,6 +132,10 @@ def check_items(name, items, sr_dict, stop_time):
 
     try:
         for item in items:
+            # skip any items in /new that have been approved
+            if name == 'submission' and item.approved_by:
+                continue
+
             item_time = datetime.utcfromtimestamp(item.created_utc)
             if item_time <= stop_time:
                 break
