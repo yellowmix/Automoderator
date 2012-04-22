@@ -68,6 +68,9 @@ def perform_action(subreddit, item, condition):
         item.remove(condition.spam)
     elif condition.action == 'approve':
         item.approve()
+    elif condition.action == 'set_flair':
+        item.set_flair(condition.set_flair_text,
+                       condition.set_flair_class)
 
     # deliver the comment if set
     if comment:
@@ -158,20 +161,22 @@ def check_items(name, items, sr_dict, stop_time):
                 setattr(subreddit, 'last_'+name, item_time)
                 seen_subs.add(subreddit.name)
 
-            # check removal conditions
+            # check removal conditions, stop checking if any matched
             if check_conditions(subreddit, item,
                     [c for c in conditions if c.action == 'remove']):
                 continue
 
+            # check set_flair conditions 
+            check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'set_flair'])
+
             # check approval conditions
-            if check_conditions(subreddit, item,
-                    [c for c in conditions if c.action == 'approve']):
-                continue
+            check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'approve'])
 
             # check alert conditions
-            if check_conditions(subreddit, item,
-                    [c for c in conditions if c.action == 'alert']):
-                continue
+            check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'alert'])
 
             # if doing reports, check auto-reapproval if enabled
             if (name == 'report' and subreddit.auto_reapprove and
@@ -378,11 +383,11 @@ def check_user_conditions(item, condition):
         return True
 
     # returning True will result in the action being performed
-    # so when removing, return True if they DON'T meet user reqs
-    # but for approving we return True if they DO meet it
-    if condition.action == 'remove':
+    # so when removing or alerting, return True if they DON'T meet user reqs
+    # but for approving and flair we return True if they DO meet it
+    if condition.action in ['remove', 'alert']:
         fail_result = True
-    elif condition.action == 'approve':
+    elif condition.action in ['approve', 'set_flair']:
         fail_result = False
 
     # if they deleted the post, fail user checks

@@ -132,8 +132,11 @@ class Condition(db.Model):
     action = db.Column(db.Enum('approve',
                                'remove',
                                'alert',
+                               'set_flair',
                                name='action'))
     spam = db.Column(db.Boolean)
+    set_flair_text = db.Column(db.Text)
+    set_flair_class = db.Column(db.String(255))
     comment_method = db.Column(db.Enum('comment',
                                        'message',
                                        'modmail',
@@ -166,6 +169,7 @@ class ActionLog(db.Model):
     action = db.Column(db.Enum('approve',
                                'remove',
                                'alert',
+                               'set_flair',
                                name='action'))
     matched_condition = db.Column(db.Integer, db.ForeignKey('conditions.id'))
 
