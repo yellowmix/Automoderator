@@ -191,12 +191,12 @@ def check_items(name, items, sr_dict, stop_time):
                     entry = AutoReapproval()
                     entry.subreddit_id = subreddit.id
                     entry.permalink = get_permalink(item)
-                    entry.original_approver = item.approved_by
+                    entry.original_approver = item.approved_by.name
                     entry.total_reports = 0
                     entry.first_approval_time = datetime.utcnow()
                     in_db = False
 
-                if (in_db or item.approved_by !=
+                if (in_db or item.approved_by.name !=
                         cfg_file.get('reddit', 'username')):
                     item.approve()
                     entry.total_reports += item.num_reports
