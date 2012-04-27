@@ -318,9 +318,9 @@ def check_condition(item, condition):
                         test_string.encode('ascii', 'ignore'),
                         condition.value.encode('ascii', 'ignore').lower())
 
-    if re.search('^'+condition.value.lower()+'$',
+    if re.search('^'+condition.value+'$',
             test_string.lower(),
-            re.DOTALL|re.UNICODE):
+            re.DOTALL|re.UNICODE|re.IGNORECASE):
         satisfied = True
     else:
         satisfied = False
