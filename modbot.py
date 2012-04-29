@@ -225,10 +225,10 @@ def filter_conditions(name, conditions):
                 c.is_shadowbanned != True]
     elif name == 'submission':
         return [c for c in conditions if c.action != 'approve' and
-                c.num_reports == None and c.is_shadowbanned != True]
+                c.is_shadowbanned != True]
     elif name == 'comment':
         return [c for c in conditions if c.action != 'approve' and
-                c.num_reports == None and c.is_shadowbanned != True]
+                c.is_shadowbanned != True]
 
 
 def check_conditions(subreddit, item, conditions):
