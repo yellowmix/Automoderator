@@ -219,7 +219,7 @@ def check_items(name, items, sr_dict, stop_time):
 def filter_conditions(name, conditions):
     """Filters a list of conditions based on the queue's needs."""
     if name == 'spam':
-        return [c for c in conditions if c.num_reports == None]
+        return [c for c in conditions]
     elif name == 'report':
         return [c for c in conditions if c.num_reports is not None and
                 c.is_shadowbanned != True]
