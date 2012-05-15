@@ -53,12 +53,12 @@ def perform_action(subreddit, item, condition):
     else:
         comment = condition.comment
 
-    # abort if it's an alert and we've already alerted on this item
-    if condition.action == 'alert':
+    # abort if it's an alert or removal that's already triggered on this item
+    if condition.action in ['alert', 'remove']:
         try:
             ActionLog.query.filter(
                 and_(ActionLog.permalink == get_permalink(item),
-                     ActionLog.action == 'alert')).one()
+                     ActionLog.matched_condition == condition.id)).one()
             return
         except NoResultFound:
             pass
