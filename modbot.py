@@ -4,7 +4,7 @@ import urllib2
 from datetime import datetime, timedelta
 from time import time
 
-import reddit
+import praw
 from BeautifulSoup import BeautifulSoup
 from sqlalchemy import func
 from sqlalchemy.sql import and_
@@ -95,7 +95,7 @@ def perform_action(subreddit, item, condition):
     action_log.action = condition.action
     action_log.matched_condition = condition.id
 
-    if isinstance(item, reddit.objects.Submission):
+    if isinstance(item, praw.objects.Submission):
         action_log.title = item.title
         action_log.url = item.url
         action_log.domain = item.domain
@@ -103,7 +103,7 @@ def perform_action(subreddit, item, condition):
                         subreddit.name,
                         condition.action,
                         item.title.encode('ascii', 'ignore'))
-    elif isinstance(item, reddit.objects.Comment):
+    elif isinstance(item, praw.objects.Comment):
         logging.info('  /r/%s: %s comment by user %s',
                         subreddit.name,
                         condition.action,
@@ -115,10 +115,10 @@ def perform_action(subreddit, item, condition):
 
 def post_comment(item, comment):
     """Posts a distinguished comment as a reply to an item."""
-    if isinstance(item, reddit.objects.Submission):
+    if isinstance(item, praw.objects.Submission):
         response = item.add_comment(comment)
         response.distinguish()
-    elif isinstance(item, reddit.objects.Comment):
+    elif isinstance(item, praw.objects.Comment):
         response = item.reply(comment)
         response.distinguish()
 
@@ -238,13 +238,13 @@ def check_conditions(subreddit, item, conditions):
     match if check_all_conditions is set on the subreddit. Returns None if no
     conditions match.
     """
-    if isinstance(item, reddit.objects.Submission):
+    if isinstance(item, praw.objects.Submission):
         conditions = [c for c in conditions
                           if c.subject == 'submission' or
                              c.subject == 'both']
         logging.debug('      Checking submission titled "%s"',
                         item.title.encode('ascii', 'ignore'))
-    elif isinstance(item, reddit.objects.Comment):
+    elif isinstance(item, praw.objects.Comment):
         conditions = [c for c in conditions
                           if c.subject == 'comment' or
                              c.subject == 'both']
@@ -285,7 +285,7 @@ def check_condition(item, condition):
         if item.author:
             test_string = item.author.name
     elif (condition.attribute == 'body' and
-            isinstance(item, reddit.objects.Submission)):
+            isinstance(item, praw.objects.Submission)):
         test_string = item.selftext
     elif condition.attribute.startswith('media_'):
         if item.media:
@@ -468,9 +468,9 @@ user_has_rank.contributor_cache = dict()
 
 def get_permalink(item):
     """Returns the permalink for the item."""
-    if isinstance(item, reddit.objects.Submission):
+    if isinstance(item, praw.objects.Submission):
         return item.permalink
-    elif isinstance(item, reddit.objects.Comment):
+    elif isinstance(item, praw.objects.Comment):
         return ('http://www.reddit.com/r/'+
                 item.subreddit.display_name+
                 '/comments/'+item.link_id.split('_')[1]+
@@ -611,7 +611,7 @@ def main():
 
     global r
     try:
-        r = reddit.Reddit(user_agent=cfg_file.get('reddit', 'user_agent'))
+        r = praw.Reddit(user_agent=cfg_file.get('reddit', 'user_agent'))
         logging.info('Logging in as %s', cfg_file.get('reddit', 'username'))
         r.login(cfg_file.get('reddit', 'username'),
             cfg_file.get('reddit', 'password'))
