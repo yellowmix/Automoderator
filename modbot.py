@@ -620,7 +620,12 @@ def main():
         sr_dict = dict()
         for subreddit in subreddits:
             sr_dict[subreddit.name.lower()] = subreddit
-        mod_subreddit = r.get_subreddit('mod')
+
+        # force population of _mod_subs and build multi-reddit
+        list(r.get_subreddit('mod').get_spam(limit=1))
+        mod_multi = '+'.join([s.name for s in subreddits
+                              if s.name.lower() in r.user._mod_subs])
+        mod_subreddit = r.get_subreddit(mod_multi)
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
