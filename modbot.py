@@ -126,8 +126,6 @@ def post_comment(item, comment):
 def check_items(name, items, sr_dict, stop_time):
     """Checks the items generator for any matching conditions."""
     item_count = 0
-    skip_count = 0
-    skip_subs = set()
     start_time = time()
     seen_subs = set()
 
@@ -143,13 +141,7 @@ def check_items(name, items, sr_dict, stop_time):
             if item_time <= stop_time:
                 break
 
-            try:
-                subreddit = sr_dict[item.subreddit.display_name.lower()]
-            except KeyError:
-                skip_count += 1
-                skip_subs.add(item.subreddit.display_name.lower())
-                continue
-
+            subreddit = sr_dict[item.subreddit.display_name.lower()]
             conditions = (subreddit.conditions
                             .filter(Condition.parent_id == None)
                             .all())
@@ -211,9 +203,8 @@ def check_items(name, items, sr_dict, stop_time):
         logging.error('  ERROR: %s', e)
         db.session.rollback()
 
-    logging.info('  Checked %s items, skipped %s items in %s (skips: %s)',
-            item_count, skip_count, elapsed_since(start_time),
-            ', '.join(skip_subs))
+    logging.info('  Checked %s items in %s',
+            item_count, elapsed_since(start_time))
 
 
 def filter_conditions(name, conditions):
