@@ -9,6 +9,7 @@ password = database_password
 user_agent = user_agent (your bot's username is fine, DO NOT FAKE)
 username = reddit_username
 password = reddit_password
+report_backlog_limit_hours = 48
 
 [loggers]
 keys=root

@@ -16,9 +16,6 @@ from models import cfg_file, path_to_cfg, db, Subreddit, Condition, \
 # global reddit session
 r = None
 
-# don't action any reports older than this
-REPORT_BACKLOG_LIMIT = timedelta(days=2)
-
 
 def perform_action(subreddit, item, condition):
     """Performs the action for the condition(s).
@@ -660,7 +657,9 @@ def main():
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'report')
     if queue_subreddit:
         items = queue_subreddit.get_reports(limit=1000)
-        stop_time = datetime.utcnow() - REPORT_BACKLOG_LIMIT
+        report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
+                                            'report_backlog_limit_hours')))
+        stop_time = datetime.utcnow() - report_backlog_limit
         check_items('report', items, sr_dict, stop_time)
 
     # check spam
