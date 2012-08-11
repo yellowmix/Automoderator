@@ -27,11 +27,12 @@ def perform_action(subreddit, item, condition):
     """
     
     global r
-    disclaimer = ('\n\n*I am a bot, and this action was performed '
-                    'automatically. Please [contact the moderators of this '
-                    'subreddit](http://www.reddit.com/message/compose?'
-                    'to=%23'+item.subreddit.display_name+') if you have any '
-                    'questions or concerns.*')
+    disclaimer = ('\n\n*[I am a bot](http://www.reddit.com/r/AutoModerator/'
+                    'comments/q11pu/what_is_automoderator/), and this action '
+                    'was performed automatically. Please [contact the '
+                    'moderators of this subreddit](http://www.reddit.com/'
+                    'message/compose?to=%2Fr%2F'+item.subreddit.display_name+
+                    ') if you have any questions or concerns.*')
 
     # build the comment if multiple conditions were matched
     if isinstance(condition, list):
@@ -84,7 +85,7 @@ def perform_action(subreddit, item, condition):
         if condition.comment_method == 'comment':
             post_comment(item, comment)
         elif condition.comment_method == 'modmail':
-            r.compose_message('#'+subreddit.name,
+            r.compose_message('/r/'+subreddit.name,
                               'AutoModerator condition matched',
                               get_permalink(item)+'\n\n'+comment)
         elif condition.comment_method == 'message':
