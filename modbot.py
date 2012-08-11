@@ -210,7 +210,7 @@ def check_items(name, items, sr_dict, stop_time):
 def filter_conditions(name, conditions):
     """Filters a list of conditions based on the queue's needs."""
     if name == 'spam':
-        return [c for c in conditions]
+        return conditions
     elif name == 'report':
         return [c for c in conditions if c.num_reports is not None and
                 c.is_shadowbanned != True]
@@ -595,6 +595,34 @@ def condition_complexity(condition):
     return complexity
 
 
+def get_multireddit_for_queue(sr_dict, queue):
+    """Returns a multireddit for a particular item queue."""
+    global r
+
+    relevant_subreddits = set()
+
+    for subreddit in sr_dict.values():
+        if queue == 'report':
+            if subreddit.auto_reapprove:
+                relevant_subreddits.add(subreddit.name)
+                continue
+        elif queue == 'comment':
+            if subreddit.reported_comments_only:
+                continue
+
+        conditions = (subreddit.conditions
+                        .filter(Condition.parent_id == None)
+                        .all())
+        conditions = filter_conditions(queue, conditions)
+        if len(conditions) > 0:
+            relevant_subreddits.add(subreddit.name)
+
+    if len(relevant_subreddits) > 0:
+        return r.get_subreddit('+'.join(relevant_subreddits))
+    else:
+        return None
+
+
 def main():
     logging.config.fileConfig(path_to_cfg)
     start_utc = datetime.utcnow()
@@ -608,41 +636,45 @@ def main():
             cfg_file.get('reddit', 'password'))
 
         subreddits = Subreddit.query.filter(Subreddit.enabled == True).all()
+        # force population of _mod_subs
+        list(r.get_subreddit('mod').get_spam(limit=1))
+
+        # build sr_dict including only subs both in db and _mod_subs
         sr_dict = dict()
         for subreddit in subreddits:
-            sr_dict[subreddit.name.lower()] = subreddit
+            if subreddit.name.lower() in r.user._mod_subs:
+                sr_dict[subreddit.name.lower()] = subreddit
 
-        # force population of _mod_subs and build multi-reddit
-        list(r.get_subreddit('mod').get_spam(limit=1))
-        mod_multi = '+'.join([s.name for s in subreddits
-                              if s.name.lower() in r.user._mod_subs])
-        mod_subreddit = r.get_subreddit(mod_multi)
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
     # check reports
-    items = mod_subreddit.get_reports(limit=1000)
-    stop_time = datetime.utcnow() - REPORT_BACKLOG_LIMIT
-    check_items('report', items, sr_dict, stop_time)
+    queue_subreddit = get_multireddit_for_queue(sr_dict, 'report')
+    if queue_subreddit:
+        items = queue_subreddit.get_reports(limit=1000)
+        stop_time = datetime.utcnow() - REPORT_BACKLOG_LIMIT
+        check_items('report', items, sr_dict, stop_time)
 
     # check spam
-    items = mod_subreddit.get_modqueue(limit=1000)
-    stop_time = (db.session.query(func.max(Subreddit.last_spam))
-                 .filter(Subreddit.enabled == True).one()[0])
-    check_items('spam', items, sr_dict, stop_time)
+    queue_subreddit = get_multireddit_for_queue(sr_dict, 'spam')
+    if queue_subreddit:
+        items = queue_subreddit.get_modqueue(limit=1000)
+        stop_time = (db.session.query(func.max(Subreddit.last_spam))
+                     .filter(Subreddit.enabled == True).one()[0])
+        check_items('spam', items, sr_dict, stop_time)
 
     # check new submissions
-    items = mod_subreddit.get_new_by_date(limit=1000)
-    stop_time = (db.session.query(func.max(Subreddit.last_submission))
-                 .filter(Subreddit.enabled == True).one()[0])
-    check_items('submission', items, sr_dict, stop_time)
+    queue_subreddit = get_multireddit_for_queue(sr_dict, 'submission')
+    if queue_subreddit:
+        items = queue_subreddit.get_new_by_date(limit=1000)
+        stop_time = (db.session.query(func.max(Subreddit.last_submission))
+                     .filter(Subreddit.enabled == True).one()[0])
+        check_items('submission', items, sr_dict, stop_time)
 
     # check new comments
-    comment_multi = '+'.join([s.name for s in subreddits
-                              if not s.reported_comments_only])
-    if comment_multi:
-        comment_multi_sr = r.get_subreddit(comment_multi)
-        items = comment_multi_sr.get_comments(limit=1000)
+    queue_subreddit = get_multireddit_for_queue(sr_dict, 'comment')
+    if queue_subreddit:
+        items = queue_subreddit.get_comments(limit=1000)
         stop_time = (db.session.query(func.max(Subreddit.last_comment))
                      .filter(Subreddit.enabled == True).one()[0])
         check_items('comment', items, sr_dict, stop_time)
