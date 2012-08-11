@@ -39,7 +39,10 @@ class Subreddit(db.Model):
     reported_comments_only - If True, will only check conditions against
         reported comments. If False, checks all comments in the subreddit.
         Extremely-active subreddits are probably best set to True.
-
+    comment_header - Text prepended to all comments posted or messaged to
+        users. Most useful if using check_all_conditions.
+    comment_footer - Text appended to all comments posted or messaged to
+        users. Most useful if using check_all_conditions.
     """
 
     __tablename__ = 'subreddits'
@@ -54,6 +57,8 @@ class Subreddit(db.Model):
     check_all_conditions = db.Column(db.Boolean, nullable=False, default=False)
     reported_comments_only = db.Column(db.Boolean, nullable=False,
                                        default=False)
+    comment_header = db.Column(db.Text)
+    comment_footer = db.Column(db.Text)
 
 
 class Condition(db.Model):

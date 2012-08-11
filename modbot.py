@@ -35,17 +35,16 @@ def perform_action(subreddit, item, condition):
 
     # build the comment if multiple conditions were matched
     if isinstance(condition, list):
+        comment = ''
         if any([c.comment for c in condition]):
             if condition[0].action == 'alert':
                 verb = 'alerted'
             else:
                 verb = condition[0].action+'d'
 
-            comment = ('This has been '+verb+' for the following reasons:\n\n')
             for c in condition:
                 if c.comment:
                     comment += '* '+c.comment+'\n'
-            post_comment(item, comment)
 
         # bit of a hack and only logs and uses attributes from first
         # condition matched, should find a better method
@@ -72,10 +71,18 @@ def perform_action(subreddit, item, condition):
         item.set_flair(condition.set_flair_text,
                        condition.set_flair_class)
 
-    # deliver the comment if set
     if comment:
+        # put together the comment parts for "public" comments
+        if condition.comment_method in ['comment', 'message']:
+            if subreddit.comment_header:
+                comment = subreddit.comment_header+'\n\n'+comment
+            if subreddit.comment_footer:
+                comment = comment+'\n\n'+subreddit.comment_footer
+            comment += disclaimer
+
+        # deliver the comment
         if condition.comment_method == 'comment':
-            post_comment(item, comment+disclaimer)
+            post_comment(item, comment)
         elif condition.comment_method == 'modmail':
             r.compose_message('#'+subreddit.name,
                               'AutoModerator condition matched',
@@ -83,7 +90,7 @@ def perform_action(subreddit, item, condition):
         elif condition.comment_method == 'message':
             r.compose_message(item.author.name,
                               'AutoModerator condition matched',
-                              get_permalink(item)+'\n\n'+comment+disclaimer)
+                              get_permalink(item)+'\n\n'+comment)
 
     # log the action taken
     action_log = ActionLog()
