@@ -35,11 +35,6 @@ def perform_action(subreddit, item, condition):
     if isinstance(condition, list):
         comment = ''
         if any([c.comment for c in condition]):
-            if condition[0].action == 'alert':
-                verb = 'alerted'
-            else:
-                verb = condition[0].action+'d'
-
             for c in condition:
                 if c.comment:
                     comment += '* '+c.comment+'\n'
