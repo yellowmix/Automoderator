@@ -17,7 +17,7 @@ from models import cfg_file, path_to_cfg, db, Subreddit, Condition, \
 r = None
 
 
-def perform_action(subreddit, item, condition):
+def perform_action(subreddit, item, condition, matchobj):
     """Performs the action for the condition(s).
     
     Also delivers the comment (if set) and creates an ActionLog entry.
@@ -42,8 +42,10 @@ def perform_action(subreddit, item, condition):
         # bit of a hack and only logs and uses attributes from first
         # condition matched, should find a better method
         condition = condition[0]
+        match = matchobj[0]
     else:
         comment = condition.comment
+        match = matchobj
 
     # abort if it's an alert or removal that's already triggered on this item
     if condition.action in ['alert', 'remove']:
@@ -55,14 +57,18 @@ def perform_action(subreddit, item, condition):
         except NoResultFound:
             pass
 
+    # perform replacements with match groups
+    comment = replace_placeholders(comment, match)
+    flair_text = replace_placeholders(condition.set_flair_text, match)
+    flair_class = replace_placeholders(condition.set_flair_class, match)
+
     # perform the action
     if condition.action == 'remove':
         item.remove(condition.spam)
     elif condition.action == 'approve':
         item.approve()
     elif condition.action == 'set_flair':
-        item.set_flair(condition.set_flair_text,
-                       condition.set_flair_class)
+        item.set_flair(flair_text, flair_class)
 
     if comment:
         # put together the comment parts for "public" comments
@@ -111,6 +117,14 @@ def perform_action(subreddit, item, condition):
 
     db.session.add(action_log)
     db.session.commit()
+
+
+def replace_placeholders(string, match):
+    """Replace placeholders in string with corresponding groups from match."""
+    if string:
+        return match.expand(string)
+    else:
+        return string
 
 
 def post_comment(item, comment):
@@ -245,22 +259,24 @@ def check_conditions(subreddit, item, conditions):
     # sort the conditions so the easiest ones are checked first
     conditions.sort(key=condition_complexity)
     matched = list()
+    match_objs = list()
 
     for condition in conditions:
         try:
             match = check_condition(item, condition)
         except:
-            match = False
+            match = None
 
         if match:
             if subreddit.check_all_conditions:
                 matched.append(condition)
+                match_objs.append(match)
             else:
-                perform_action(subreddit, item, condition)
+                perform_action(subreddit, item, condition, match)
                 return condition
 
     if subreddit.check_all_conditions and len(matched) > 0:
-        perform_action(subreddit, item, matched)
+        perform_action(subreddit, item, matched, match_objs)
         return matched
     return None
 
@@ -309,9 +325,10 @@ def check_condition(item, condition):
                         test_string.encode('ascii', 'ignore'),
                         condition.value.encode('ascii', 'ignore').lower())
 
-    if re.search('^'+condition.value+'$',
-            test_string.lower(),
-            re.DOTALL|re.UNICODE|re.IGNORECASE):
+    match = re.search('^'+condition.value+'$',
+                test_string.lower(),
+                re.DOTALL|re.UNICODE|re.IGNORECASE)
+    if match:
         satisfied = True
     else:
         satisfied = False
@@ -358,7 +375,7 @@ def check_condition(item, condition):
 
     logging.debug('        Result = %s in %s',
                     satisfied, elapsed_since(start_time))
-    return satisfied
+    return match
 
 
 def check_user_conditions(item, condition):
