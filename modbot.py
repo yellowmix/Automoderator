@@ -284,7 +284,8 @@ def check_conditions(subreddit, item, conditions):
 def check_condition(item, condition):
     """Checks an item against a single condition (and sub-conditions).
     
-    Returns True if it matches, or False if not
+    Returns the MatchObject from the re if condition satisfied, or returns
+    None if not.
     """
     start_time = time()
 
@@ -375,7 +376,10 @@ def check_condition(item, condition):
 
     logging.debug('        Result = %s in %s',
                     satisfied, elapsed_since(start_time))
-    return match
+    if satisfied:
+        return match
+    else
+        return None
 
 
 def check_user_conditions(item, condition):
