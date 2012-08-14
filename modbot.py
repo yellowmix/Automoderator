@@ -367,8 +367,8 @@ def check_condition(item, condition):
         if condition.additional_conditions:
             logging.debug('        Checking sub-conditions:')
         for sub_condition in condition.additional_conditions:
-            match = check_condition(item, sub_condition)
-            if not match:
+            sub_match = check_condition(item, sub_condition)
+            if not sub_match:
                 satisfied = False
                 break
         if condition.additional_conditions:
