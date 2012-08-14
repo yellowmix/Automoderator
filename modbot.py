@@ -378,7 +378,7 @@ def check_condition(item, condition):
                     satisfied, elapsed_since(start_time))
     if satisfied:
         return match
-    else
+    else:
         return None
 
 
