@@ -121,7 +121,7 @@ def perform_action(subreddit, item, condition, matchobj):
 
 def replace_placeholders(string, match):
     """Replace placeholders in string with corresponding groups from match."""
-    if string:
+    if string and not isinstance(match, bool):
         return match.expand(string)
     else:
         return string
@@ -377,7 +377,10 @@ def check_condition(item, condition):
     logging.debug('        Result = %s in %s',
                     satisfied, elapsed_since(start_time))
     if satisfied:
-        return match
+        if not condition.inverse:
+            return match
+        else:
+            return True
     else:
         return None
 
