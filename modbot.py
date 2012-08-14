@@ -47,8 +47,8 @@ def perform_action(subreddit, item, condition, matchobj):
         comment = condition.comment
         match = matchobj
 
-    # abort if it's an alert or removal that's already triggered on this item
-    if condition.action in ['alert', 'remove']:
+    # abort if it's an alert, removal, or set_flair that's already triggered
+    if condition.action in ['alert', 'remove', 'set_flair']:
         try:
             ActionLog.query.filter(
                 and_(ActionLog.permalink == get_permalink(item),
