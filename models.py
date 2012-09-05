@@ -63,8 +63,10 @@ class Subreddit(db.Model):
 
 class Condition(db.Model):
 
-    """Table containing the conditions for each subreddit.
+    """Table containing conditions, independent of subreddit.
 
+    name - a name identifying a condition or set of conditions, allows
+        subreddits to "subscribe" to standard conditions
     subject - The type of item to check
     attribute - Which attribute of the item to check
     value - A regex checked against the attribute. Automatically surrounded
@@ -101,7 +103,7 @@ class Condition(db.Model):
     __tablename__ = 'conditions'
 
     id = db.Column(db.Integer, primary_key=True)
-    subreddit_id = db.Column(db.Integer, db.ForeignKey('subreddits.id'))
+    name = db.Column(db.String(255))
     subject = db.Column(db.Enum('submission',
                                 'comment',
                                 'both',
@@ -149,11 +151,70 @@ class Condition(db.Model):
     comment = db.Column(db.Text)
     notes = db.Column(db.Text)
 
+    additional_conditions = db.relationship('Condition',
+        lazy='joined', join_depth=1)
+
+
+class SubredditCondition(db.Model):
+
+    """Table assigning conditions to particular subreddits.
+
+    override_default_action - whether to use the action, comment_method,
+        comment, set_flair_text, and set_flair_class from this table
+        or the standard ones defined in the condition
+
+    """
+
+    __tablename__ = 'subreddit_conditions'
+
+    subreddit_id = db.Column(db.Integer,
+                             db.ForeignKey('subreddits.id'),
+                             primary_key=True,
+                             nullable=False)
+    condition_id = db.Column(db.Integer,
+                             db.ForeignKey('conditions.id'),
+                             primary_key=True,
+                             nullable=False)
+    override_default_action = db.Column(db.Boolean,
+                                        nullable=False,
+                                        default=False)
+    action = db.Column(db.Enum('approve',
+                               'remove',
+                               'alert',
+                               'set_flair',
+                               name='action'))
+    spam = db.Column(db.Boolean)
+    set_flair_text = db.Column(db.Text)
+    set_flair_class = db.Column(db.String(255))
+    comment_method = db.Column(db.Enum('comment',
+                                       'message',
+                                       'modmail',
+                                       name='comment_method'))
+    comment = db.Column(db.Text)
+
     subreddit = db.relationship('Subreddit',
         backref=db.backref('conditions', lazy='dynamic'))
 
-    additional_conditions = db.relationship('Condition',
-        lazy='joined', join_depth=1)
+    condition = db.relationship('Condition',
+        backref=db.backref('subreddits', lazy='dynamic'))
+
+    # if override_default_action is not set, we will pass through any
+    # action-related attributes to the underlying Condition object
+    def __getattribute__(self, attr):
+        overlayable_attrs = ['action', 'spam', 'comment_method', 'comment',
+                             'set_flair_text', 'set_flair_class']
+        if attr not in overlayable_attrs:
+            return object.__getattribute__(self, attr)
+
+        if (not self.override_default_action and
+                 attr in overlayable_attrs):
+            return getattr(self.condition, attr)
+
+        return object.__getattribute__(self, attr)
+
+    # pass any nonexistent attrs through to the Condition
+    def __getattr__(self, attr):
+        return getattr(self.condition, attr)
 
 
 class ActionLog(db.Model):

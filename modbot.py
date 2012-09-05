@@ -11,7 +11,7 @@ from sqlalchemy.sql import and_
 from sqlalchemy.orm.exc import NoResultFound
 
 from models import cfg_file, path_to_cfg, db, Subreddit, Condition, \
-    ActionLog, AutoReapproval
+    SubredditCondition, ActionLog, AutoReapproval
 
 # global reddit session
 r = None
@@ -156,9 +156,7 @@ def check_items(name, items, sr_dict, stop_time):
                 break
 
             subreddit = sr_dict[item.subreddit.display_name.lower()]
-            conditions = (subreddit.conditions
-                            .filter(Condition.parent_id == None)
-                            .all())
+            conditions = subreddit.conditions.all()
             conditions = filter_conditions(name, conditions)
 
             item_count += 1
@@ -634,9 +632,7 @@ def get_multireddit_for_queue(sr_dict, queue):
             if subreddit.reported_comments_only:
                 continue
 
-        conditions = (subreddit.conditions
-                        .filter(Condition.parent_id == None)
-                        .all())
+        conditions = subreddit.conditions.all()
         conditions = filter_conditions(queue, conditions)
         if len(conditions) > 0:
             relevant_subreddits.add(subreddit.name)
