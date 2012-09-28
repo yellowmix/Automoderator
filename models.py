@@ -1,8 +1,11 @@
 import sys, os
 from ConfigParser import SafeConfigParser
 
-from modbot_site import app
-from flaskext.sqlalchemy import SQLAlchemy
+from sqlalchemy import create_engine
+from sqlalchemy import Integer, Enum, Float, String, Text, DateTime, Boolean, \
+                       Column, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship, backref
+from sqlalchemy.ext.declarative import declarative_base
 
 
 cfg_file = SafeConfigParser()
@@ -10,16 +13,18 @@ path_to_cfg = os.path.abspath(os.path.dirname(sys.argv[0]))
 path_to_cfg = os.path.join(path_to_cfg, 'modbot.cfg')
 cfg_file.read(path_to_cfg)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = \
+engine = create_engine(
     cfg_file.get('database', 'system')+'://'+\
     cfg_file.get('database', 'username')+':'+\
     cfg_file.get('database', 'password')+'@'+\
     cfg_file.get('database', 'host')+'/'+\
-    cfg_file.get('database', 'database')
-db = SQLAlchemy(app)
+    cfg_file.get('database', 'database'))
+Base = declarative_base()
+Session = sessionmaker(bind=engine)
+session = Session()
 
 
-class Subreddit(db.Model):
+class Subreddit(Base):
 
     """Table containing the subreddits for the bot to monitor.
 
@@ -47,21 +52,21 @@ class Subreddit(db.Model):
 
     __tablename__ = 'subreddits'
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False, unique=True)
-    enabled = db.Column(db.Boolean, nullable=False, default=True)
-    last_submission = db.Column(db.DateTime, nullable=False)
-    last_spam = db.Column(db.DateTime, nullable=False)
-    last_comment = db.Column(db.DateTime, nullable=False)
-    auto_reapprove = db.Column(db.Boolean, nullable=False, default=False)
-    check_all_conditions = db.Column(db.Boolean, nullable=False, default=False)
-    reported_comments_only = db.Column(db.Boolean, nullable=False,
-                                       default=False)
-    comment_header = db.Column(db.Text)
-    comment_footer = db.Column(db.Text)
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    last_submission = Column(DateTime, nullable=False)
+    last_spam = Column(DateTime, nullable=False)
+    last_comment = Column(DateTime, nullable=False)
+    auto_reapprove = Column(Boolean, nullable=False, default=False)
+    check_all_conditions = Column(Boolean, nullable=False, default=False)
+    reported_comments_only = Column(Boolean, nullable=False,
+                                    default=False)
+    comment_header = Column(Text)
+    comment_footer = Column(Text)
 
 
-class Condition(db.Model):
+class Condition(Base):
 
     """Table containing conditions, independent of subreddit.
 
@@ -103,14 +108,14 @@ class Condition(db.Model):
 
     __tablename__ = 'conditions'
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255))
-    subject = db.Column(db.Enum('submission',
-                                'comment',
-                                'both',
-                                name='condition_subject'),
-                        nullable=False)
-    attribute = db.Column(db.Enum('user',
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255))
+    subject = Column(Enum('submission',
+                          'comment',
+                          'both',
+                          name='condition_subject'),
+                     nullable=False)
+    attribute = Column(Enum('user',
                                   'title',
                                   'domain',
                                   'url',
@@ -122,41 +127,41 @@ class Condition(db.Model):
                                   'author_flair_css_class',
                                   'meme_name',
                                   name='condition_attribute'),
-                          nullable=False)
-    value = db.Column(db.Text, nullable=False)
-    num_reports = db.Column(db.Integer)
-    auto_reapproving = db.Column(db.Boolean, default=False)
-    is_gold = db.Column(db.Boolean)
-    is_shadowbanned = db.Column(db.Boolean)
-    account_age = db.Column(db.Integer)
-    link_karma = db.Column(db.Integer)
-    comment_karma = db.Column(db.Integer)
-    combined_karma = db.Column(db.Integer)
-    account_rank = db.Column(db.Enum('contributor',
-                                     'moderator',
-                                     name='rank'))
-    inverse = db.Column(db.Boolean, nullable=False, default=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey('conditions.id'))
-    action = db.Column(db.Enum('approve',
-                               'remove',
-                               'alert',
-                               'set_flair',
-                               name='action'))
-    spam = db.Column(db.Boolean)
-    set_flair_text = db.Column(db.Text)
-    set_flair_class = db.Column(db.String(255))
-    comment_method = db.Column(db.Enum('comment',
-                                       'message',
-                                       'modmail',
-                                       name='comment_method'))
-    comment = db.Column(db.Text)
-    notes = db.Column(db.Text)
+                       nullable=False)
+    value = Column(Text, nullable=False)
+    num_reports = Column(Integer)
+    auto_reapproving = Column(Boolean, default=False)
+    is_gold = Column(Boolean)
+    is_shadowbanned = Column(Boolean)
+    account_age = Column(Integer)
+    link_karma = Column(Integer)
+    comment_karma = Column(Integer)
+    combined_karma = Column(Integer)
+    account_rank = Column(Enum('contributor',
+                               'moderator',
+                               name='rank'))
+    inverse = Column(Boolean, nullable=False, default=False)
+    parent_id = Column(Integer, ForeignKey('conditions.id'))
+    action = Column(Enum('approve',
+                         'remove',
+                         'alert',
+                         'set_flair',
+                         name='action'))
+    spam = Column(Boolean)
+    set_flair_text = Column(Text)
+    set_flair_class = Column(String(255))
+    comment_method = Column(Enum('comment',
+                                 'message',
+                                 'modmail',
+                                 name='comment_method'))
+    comment = Column(Text)
+    notes = Column(Text)
 
-    additional_conditions = db.relationship('Condition',
+    additional_conditions = relationship('Condition',
         lazy='joined', join_depth=1)
 
 
-class SubredditCondition(db.Model):
+class SubredditCondition(Base):
 
     """Table assigning conditions to particular subreddits.
 
@@ -168,36 +173,36 @@ class SubredditCondition(db.Model):
 
     __tablename__ = 'subreddit_conditions'
 
-    subreddit_id = db.Column(db.Integer,
-                             db.ForeignKey('subreddits.id'),
-                             primary_key=True,
-                             nullable=False)
-    condition_id = db.Column(db.Integer,
-                             db.ForeignKey('conditions.id'),
-                             primary_key=True,
-                             nullable=False)
-    override_default_action = db.Column(db.Boolean,
-                                        nullable=False,
-                                        default=False)
-    action = db.Column(db.Enum('approve',
-                               'remove',
-                               'alert',
-                               'set_flair',
-                               name='action'))
-    spam = db.Column(db.Boolean)
-    set_flair_text = db.Column(db.Text)
-    set_flair_class = db.Column(db.String(255))
-    comment_method = db.Column(db.Enum('comment',
-                                       'message',
-                                       'modmail',
-                                       name='comment_method'))
-    comment = db.Column(db.Text)
+    subreddit_id = Column(Integer,
+                          ForeignKey('subreddits.id'),
+                          primary_key=True,
+                          nullable=False)
+    condition_id = Column(Integer,
+                          ForeignKey('conditions.id'),
+                          primary_key=True,
+                          nullable=False)
+    override_default_action = Column(Boolean,
+                                     nullable=False,
+                                     default=False)
+    action = Column(Enum('approve',
+                         'remove',
+                         'alert',
+                         'set_flair',
+                         name='action'))
+    spam = Column(Boolean)
+    set_flair_text = Column(Text)
+    set_flair_class = Column(String(255))
+    comment_method = Column(Enum('comment',
+                                 'message',
+                                 'modmail',
+                                 name='comment_method'))
+    comment = Column(Text)
 
-    subreddit = db.relationship('Subreddit',
-        backref=db.backref('conditions', lazy='dynamic'))
+    subreddit = relationship('Subreddit',
+        backref=backref('conditions', lazy='dynamic'))
 
-    condition = db.relationship('Condition',
-        backref=db.backref('subreddits', lazy='dynamic'))
+    condition = relationship('Condition',
+        backref=backref('subreddits', lazy='dynamic'))
 
     # if override_default_action is not set, we will pass through any
     # action-related attributes to the underlying Condition object
@@ -218,49 +223,49 @@ class SubredditCondition(db.Model):
         return getattr(self.condition, attr)
 
 
-class ActionLog(db.Model):
+class ActionLog(Base):
     """Table containing a log of the bot's actions."""
     __tablename__ = 'action_log'
 
-    id = db.Column(db.Integer, primary_key=True)
-    subreddit_id = db.Column(db.Integer,
-                             db.ForeignKey('subreddits.id'),
+    id = Column(Integer, primary_key=True)
+    subreddit_id = Column(Integer,
+                             ForeignKey('subreddits.id'),
                              nullable=False)
-    title = db.Column(db.Text)
-    user = db.Column(db.String(255))
-    url = db.Column(db.Text)
-    domain = db.Column(db.String(255))
-    permalink = db.Column(db.String(255))
-    created_utc = db.Column(db.DateTime)
-    action_time = db.Column(db.DateTime)
-    action = db.Column(db.Enum('approve',
-                               'remove',
-                               'alert',
-                               'set_flair',
-                               name='action'))
-    matched_condition = db.Column(db.Integer, db.ForeignKey('conditions.id'))
+    title = Column(Text)
+    user = Column(String(255))
+    url = Column(Text)
+    domain = Column(String(255))
+    permalink = Column(String(255))
+    created_utc = Column(DateTime)
+    action_time = Column(DateTime)
+    action = Column(Enum('approve',
+                         'remove',
+                         'alert',
+                         'set_flair',
+                         name='action'))
+    matched_condition = Column(Integer, ForeignKey('conditions.id'))
 
-    subreddit = db.relationship('Subreddit',
-        backref=db.backref('actions', lazy='dynamic'))
+    subreddit = relationship('Subreddit',
+        backref=backref('actions', lazy='dynamic'))
 
-    condition = db.relationship('Condition',
-        backref=db.backref('actions', lazy='dynamic'))
+    condition = relationship('Condition',
+        backref=backref('actions', lazy='dynamic'))
 
 
-class AutoReapproval(db.Model):
+class AutoReapproval(Base):
     """Table keeping track of posts that have been auto-reapproved."""
     __tablename__ = 'auto_reapprovals'
 
-    id = db.Column(db.Integer, primary_key=True)
-    subreddit_id = db.Column(db.Integer,
-                             db.ForeignKey('subreddits.id'),
-                             nullable=False)
-    permalink = db.Column(db.String(255))
-    original_approver = db.Column(db.String(255))
-    total_reports = db.Column(db.Integer, nullable=False, default=0)
-    first_approval_time = db.Column(db.DateTime)
-    last_approval_time = db.Column(db.DateTime)
+    id = Column(Integer, primary_key=True)
+    subreddit_id = Column(Integer,
+                          ForeignKey('subreddits.id'),
+                          nullable=False)
+    permalink = Column(String(255))
+    original_approver = Column(String(255))
+    total_reports = Column(Integer, nullable=False, default=0)
+    first_approval_time = Column(DateTime)
+    last_approval_time = Column(DateTime)
 
-    subreddit = db.relationship('Subreddit',
-        backref=db.backref('auto_reapprovals', lazy='dynamic'))
+    subreddit = relationship('Subreddit',
+        backref=backref('auto_reapprovals', lazy='dynamic'))
 

@@ -10,8 +10,8 @@ from sqlalchemy import func
 from sqlalchemy.sql import and_
 from sqlalchemy.orm.exc import NoResultFound
 
-from models import cfg_file, path_to_cfg, db, Subreddit, Condition, \
-    SubredditCondition, ActionLog, AutoReapproval
+from models import cfg_file, path_to_cfg, session, Subreddit, Condition, \
+                   SubredditCondition, ActionLog, AutoReapproval
 
 # global reddit session
 r = None
@@ -50,7 +50,7 @@ def perform_action(subreddit, item, condition, matchobj):
     # abort if it's an alert, removal, or set_flair that's already triggered
     if condition.action in ['alert', 'remove', 'set_flair']:
         try:
-            ActionLog.query.filter(
+            session.query(ActionLog).filter(
                 and_(ActionLog.permalink == get_permalink(item),
                      ActionLog.matched_condition == condition.id)).one()
             return
@@ -115,8 +115,8 @@ def perform_action(subreddit, item, condition, matchobj):
                         condition.action,
                         item.author.name)
 
-    db.session.add(action_log)
-    db.session.commit()
+    session.add(action_log)
+    session.commit()
 
 
 def replace_placeholders(string, match):
@@ -187,7 +187,7 @@ def check_items(name, items, sr_dict, stop_time):
                     item.approved_by is not None):
                 try:
                     # see if this item has already been auto-reapproved
-                    entry = (AutoReapproval.query.filter(
+                    entry = (session.query(AutoReapproval).filter(
                             AutoReapproval.permalink == get_permalink(item))
                             .one())
                     in_db = True
@@ -206,14 +206,14 @@ def check_items(name, items, sr_dict, stop_time):
                     entry.total_reports += item.num_reports
                     entry.last_approval_time = datetime.utcnow()
 
-                    db.session.add(entry)
-                    db.session.commit()
+                    session.add(entry)
+                    session.commit()
                     logging.info('  Re-approved %s', entry.permalink)
                             
-        db.session.commit()
+        session.commit()
     except Exception as e:
         logging.error('  ERROR: %s', e)
-        db.session.rollback()
+        session.rollback()
 
     logging.info('  Checked %s items in %s',
             item_count, elapsed_since(start_time))
@@ -342,7 +342,7 @@ def check_condition(item, condition):
         if condition.auto_reapproving != False:
             # get number of reports already cleared
             try:
-                entry = (AutoReapproval.query.filter(
+                entry = (session.query(AutoReapproval).filter(
                          AutoReapproval.permalink == get_permalink(item))
                         .one())
                 previous_reports = entry.total_reports
@@ -494,7 +494,7 @@ def respond_to_modmail(modmail, start_time):
     cache = list()
     # respond to any modmail sent in the last 5 mins
     time_window = timedelta(minutes=5)
-    approvals = ActionLog.query.filter(
+    approvals = session.query(ActionLog).filter(
                     and_(ActionLog.action == 'approve',
                          ActionLog.action_time >= start_time - time_window)
                     ).all()
@@ -654,7 +654,8 @@ def main():
         r.login(cfg_file.get('reddit', 'username'),
             cfg_file.get('reddit', 'password'))
 
-        subreddits = Subreddit.query.filter(Subreddit.enabled == True).all()
+        subreddits = session.query(Subreddit).filter(
+                        Subreddit.enabled == True).all()
         # force population of _mod_subs
         list(r.get_subreddit('mod').get_spam(limit=1))
 
@@ -680,7 +681,7 @@ def main():
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'spam')
     if queue_subreddit:
         items = queue_subreddit.get_modqueue(limit=1000)
-        stop_time = (db.session.query(func.max(Subreddit.last_spam))
+        stop_time = (session.query(func.max(Subreddit.last_spam))
                      .filter(Subreddit.enabled == True).one()[0])
         check_items('spam', items, sr_dict, stop_time)
 
@@ -688,7 +689,7 @@ def main():
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'submission')
     if queue_subreddit:
         items = queue_subreddit.get_new_by_date(limit=1000)
-        stop_time = (db.session.query(func.max(Subreddit.last_submission))
+        stop_time = (session.query(func.max(Subreddit.last_submission))
                      .filter(Subreddit.enabled == True).one()[0])
         check_items('submission', items, sr_dict, stop_time)
 
@@ -696,7 +697,7 @@ def main():
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'comment')
     if queue_subreddit:
         items = queue_subreddit.get_comments(limit=1000)
-        stop_time = (db.session.query(func.max(Subreddit.last_comment))
+        stop_time = (session.query(func.max(Subreddit.last_comment))
                      .filter(Subreddit.enabled == True).one()[0])
         check_items('comment', items, sr_dict, stop_time)
 
