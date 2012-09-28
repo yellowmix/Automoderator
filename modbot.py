@@ -222,9 +222,10 @@ def check_items(name, items, sr_dict, stop_time):
 def filter_conditions(name, conditions):
     """Filters a list of conditions based on the queue's needs."""
     if name == 'spam':
-        return conditions
+        return [c for c in conditions if c.num_reports < 1]
     elif name == 'report':
-        return [c for c in conditions if c.num_reports is not None and
+        return [c for c in conditions if
+                (c.action != 'approve' or c.num_reports > 0) and
                 c.is_shadowbanned != True]
     elif name == 'submission':
         return [c for c in conditions if c.action != 'approve' and
@@ -352,8 +353,6 @@ def check_condition(item, condition):
             total_reports = item.num_reports
 
         satisfied = (total_reports >= condition.num_reports)
-    elif satisfied and condition.num_reports is None:
-        satisfied = (item.num_reports == 0)
 
     # check user conditions if necessary
     if satisfied:

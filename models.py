@@ -72,8 +72,9 @@ class Condition(db.Model):
     value - A regex checked against the attribute. Automatically surrounded
         by ^ and $ when checked, so looks for "whole string" matches. To
         do a "contains" check, put .* on each end
-    num_reports - The number of reports the item has. Note that setting to
-        None means a matching item *must* have 0 reports.
+    num_reports - The number of reports the item has. 0 and null are
+        functionally equivalent. Note: to approve reported items, this
+        must be set to at least 1
     auto_reapproving - Whether the num_reports condition should apply only
         during auto-reapproving, only before, or both (if null)
     is_gold - Whether the author has reddit gold or not
