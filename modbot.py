@@ -159,6 +159,11 @@ def check_items(name, items, sr_dict, stop_time):
             conditions = subreddit.conditions.all()
             conditions = filter_conditions(name, conditions)
 
+            # don't need to check for shadowbanned unless we're in spam
+            if name == 'spam':
+                for condition in conditions:
+                    condition.check_shadowbanned = True
+
             item_count += 1
 
             if subreddit.name not in seen_subs:
@@ -413,7 +418,7 @@ def check_user_conditions(item, condition):
             return fail_result
 
     # shadowbanned check
-    if condition.is_shadowbanned is not None:
+    if condition.is_shadowbanned is not None and condition.check_shadowbanned:
         if condition.is_shadowbanned != user_is_shadowbanned(item.author):
             return fail_result
 

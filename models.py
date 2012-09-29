@@ -160,6 +160,8 @@ class Condition(Base):
     additional_conditions = relationship('Condition',
         lazy='joined', join_depth=1)
 
+    check_shadowbanned = False
+
 
 class SubredditCondition(Base):
 
