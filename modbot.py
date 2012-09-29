@@ -414,10 +414,7 @@ def check_user_conditions(item, condition):
 
     # shadowbanned check
     if condition.is_shadowbanned is not None:
-        user = item.reddit_session.get_redditor(item.author, fetch=False)
-        try: # try to get user overview
-            list(user.get_overview(limit=1))
-        except: # if that failed, they're probably shadowbanned
+        if condition.is_shadowbanned != user_is_shadowbanned(item.author):
             return fail_result
 
     # get user info
@@ -476,6 +473,39 @@ def user_has_rank(subreddit, user, rank):
     return False
 user_has_rank.moderator_cache = dict()
 user_has_rank.contributor_cache = dict()
+
+
+def user_is_shadowbanned(username):
+    """Returns true if the user is shadowbanned."""
+    global r
+
+    # build user cache by parsing modqueue html if this is first call
+    if not user_is_shadowbanned.user_cache:
+        # would be better as a minimal multireddit
+        page = r._request('http://www.reddit.com/r/mod/about/modqueue')
+        soup = BeautifulSoup(page)
+        results = soup.find_all(class_='spam')
+
+        for item in results:
+            user = item.find(class_='entry').find(class_='author').text
+            if 'banned-user' in item.attrs['class']:
+                user_is_shadowbanned.user_cache[user] = True
+            else:
+                user_is_shadowbanned.user_cache[user] = False
+        print 'Modqueue scrape results = '+str(user_is_shadowbanned.user_cache)
+
+    # if this is one of the users we scraped, return that result
+    if username in user_is_shadowbanned.user_cache:
+        return user_is_shadowbanned.user_cache[username]
+
+    # fall back to trying to load the user's overview
+    user = item.reddit_session.get_redditor(username, fetch=False)
+    try: # try to get user overview
+        list(user.get_overview(limit=1))
+    except: # if that failed, they're probably shadowbanned
+        return True
+    return False
+user_is_shadowbanned.user_cache = dict()
 
 
 def get_permalink(item):
