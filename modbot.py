@@ -163,6 +163,9 @@ def check_items(name, items, sr_dict, stop_time):
             if name == 'spam':
                 for condition in conditions:
                     condition.check_shadowbanned = True
+            else:
+                for condition in conditions:
+                    condition.check_shadowbanned = False
 
             item_count += 1
 
