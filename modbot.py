@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from time import time
 
 import praw
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from sqlalchemy import func
 from sqlalchemy.sql import and_
 from sqlalchemy.orm.exc import NoResultFound
@@ -558,9 +558,9 @@ def get_meme_name(item):
 
         if (item.domain in ['quickmeme.com', 'qkme.me'] or
                 item.domain.endswith('.qkme.me')):
-            return soup.findAll(id='meme_name')[0].text
+            return soup.find_all(id='meme_name')[0].text
         elif item.domain.endswith('memegenerator.net'):
-            result = soup.findAll(attrs={'class': 'rank'})[0]
+            result = soup.find_all(attrs={'class': 'rank'})[0]
             matches = re.search('#\\d+ (.+)$', result.text)
             return matches.group(1)
         elif item.domain == 'troll.me':
