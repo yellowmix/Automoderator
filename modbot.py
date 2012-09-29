@@ -492,7 +492,6 @@ def user_is_shadowbanned(username):
                 user_is_shadowbanned.user_cache[user] = True
             else:
                 user_is_shadowbanned.user_cache[user] = False
-        print 'Modqueue scrape results = '+str(user_is_shadowbanned.user_cache)
 
     # if this is one of the users we scraped, return that result
     if username in user_is_shadowbanned.user_cache:
