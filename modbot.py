@@ -422,7 +422,8 @@ def check_user_conditions(item, condition):
 
     # shadowbanned check
     if condition.is_shadowbanned is not None and condition.check_shadowbanned:
-        if condition.is_shadowbanned != user_is_shadowbanned(item.author):
+        # this probably isn't correct, but it's how it worked before
+        if user_is_shadowbanned(item.author):
             return fail_result
 
     # get user info
