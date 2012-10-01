@@ -271,7 +271,8 @@ def check_conditions(subreddit, item, conditions):
     for condition in conditions:
         try:
             match = check_condition(item, condition)
-        except:
+        except Exception as e:
+            logging.error('  ERROR: Condition #%s - %s', condition.id, e)
             match = None
 
         if match:
@@ -604,8 +605,8 @@ def get_meme_name(item):
         elif item.domain == 'troll.me':
             matches = re.search('^.+?\| (.+?) \|.+?$', soup.title.text)
             return matches.group(1)
-    except:
-        pass
+    except Exception as e:
+        logging.warning('  WARNING: %s', e)
     return None
 
 
