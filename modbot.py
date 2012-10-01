@@ -620,8 +620,8 @@ def condition_complexity(condition):
     """Returns a value representing how difficult a condition is to check."""
     complexity = 0
 
-    # approving or removing requires a request
-    if condition.action in ('approve', 'remove'):
+    # approving, removing, or setting flair requires a request
+    if condition.action in ('approve', 'remove', 'set_flair'):
         complexity += 1
 
     # meme_name requires an external site page load
@@ -630,15 +630,10 @@ def condition_complexity(condition):
 
     # checking user requires a page load
     if (condition.is_gold is not None or
-            condition.is_shadowbanned is not None or
             condition.link_karma is not None or
             condition.comment_karma is not None or
             condition.combined_karma is not None or
             condition.account_age is not None):
-        complexity += 1
-
-    # checking shadowbanned requires an extra page load
-    if condition.is_shadowbanned is not None:
         complexity += 1
 
     if condition.comment is not None:
