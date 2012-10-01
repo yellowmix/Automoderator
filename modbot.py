@@ -423,7 +423,7 @@ def check_user_conditions(item, condition):
     # shadowbanned check
     if condition.is_shadowbanned is not None and condition.check_shadowbanned:
         # this probably isn't correct, but it's how it worked before
-        if user_is_shadowbanned(item.author):
+        if user_is_shadowbanned(item.author.name):
             return fail_result
 
     # get user info
@@ -507,7 +507,7 @@ def user_is_shadowbanned(username):
         return user_is_shadowbanned.user_cache[username]
 
     # fall back to trying to load the user's overview
-    user = item.reddit_session.get_redditor(username, fetch=False)
+    user = r.get_redditor(username, fetch=False)
     try: # try to get user overview
         list(user.get_overview(limit=1))
     except: # if that failed, they're probably shadowbanned
