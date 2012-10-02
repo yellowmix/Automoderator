@@ -120,6 +120,8 @@ class Condition(Base):
                                   'domain',
                                   'url',
                                   'body',
+                                  'title+body',
+                                  'url+body',
                                   'media_user',
                                   'media_title',
                                   'media_description',

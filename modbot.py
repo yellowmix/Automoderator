@@ -318,6 +318,16 @@ def check_condition(item, condition):
             test_string = ''
     elif condition.attribute == 'meme_name':
         test_string = get_meme_name(item)
+    elif condition.attribute == 'title+body':
+        if isinstance(item, praw.objects.Submission):
+            test_string = [item.title, item.selftext]
+        else:
+            test_string = item.body
+    elif condition.attribute == 'url+body':
+        if isinstance(item, praw.objects.Submission):
+            test_string = [item.url, item.selftext]
+        else:
+            test_string = item.body
     else:
         test_string = getattr(item, condition.attribute)
     if not test_string:
@@ -326,17 +336,26 @@ def check_condition(item, condition):
     if condition.inverse:
         logging.debug('        Check #%s: "%s" NOT match ^%s$',
                         condition.id,
-                        test_string.encode('ascii', 'ignore'),
+                        '/'.join(test_string).encode('ascii', 'ignore'),
                         condition.value.encode('ascii', 'ignore').lower())
     else:
         logging.debug('        Check #%s: "%s" match ^%s$',
                         condition.id,
-                        test_string.encode('ascii', 'ignore'),
+                        '/'.join(test_string).encode('ascii', 'ignore'),
                         condition.value.encode('ascii', 'ignore').lower())
 
-    match = re.search('^'+condition.value+'$',
-                test_string.lower(),
-                re.DOTALL|re.UNICODE|re.IGNORECASE)
+    if isinstance(test_string, list):
+        for test in test_string:
+            match = re.search('^'+condition.value+'$',
+                        test.lower(),
+                        re.DOTALL|re.UNICODE|re.IGNORECASE)
+            if match:
+                break
+    else:
+        match = re.search('^'+condition.value+'$',
+                    test_string.lower(),
+                    re.DOTALL|re.UNICODE|re.IGNORECASE)
+
     if match:
         satisfied = True
     else:
