@@ -296,6 +296,7 @@ def check_condition(item, condition):
     None if not.
     """
     start_time = time()
+    test_string = None
 
     if condition.attribute == 'user':
         if item.author:
