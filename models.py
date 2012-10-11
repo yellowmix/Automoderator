@@ -13,12 +13,17 @@ path_to_cfg = os.path.abspath(os.path.dirname(sys.argv[0]))
 path_to_cfg = os.path.join(path_to_cfg, 'modbot.cfg')
 cfg_file.read(path_to_cfg)
 
-engine = create_engine(
-    cfg_file.get('database', 'system')+'://'+\
-    cfg_file.get('database', 'username')+':'+\
-    cfg_file.get('database', 'password')+'@'+\
-    cfg_file.get('database', 'host')+'/'+\
-    cfg_file.get('database', 'database'))
+if cfg_file.get('database', 'system').lower() == 'sqlite':
+    engine = create_engine(
+        cfg_file.get('database', 'system')+':///'+\
+        cfg_file.get('database', 'database'))
+else:
+    engine = create_engine(
+        cfg_file.get('database', 'system')+'://'+\
+        cfg_file.get('database', 'username')+':'+\
+        cfg_file.get('database', 'password')+'@'+\
+        cfg_file.get('database', 'host')+'/'+\
+        cfg_file.get('database', 'database'))
 Base = declarative_base()
 Session = sessionmaker(bind=engine)
 session = Session()

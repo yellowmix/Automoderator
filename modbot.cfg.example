@@ -1,3 +1,8 @@
+# if using sqlite:
+#   set system to sqlite
+#   database to the path to the database file (relative or absolute)
+#   host, username, and password will all be ignored
+
 [database]
 system = postgresql
 host = localhost
