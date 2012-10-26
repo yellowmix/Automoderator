@@ -448,7 +448,13 @@ def check_user_conditions(item, condition):
             return fail_result
 
     # get user info
-    user = item.reddit_session.get_redditor(item.author)
+    try:
+        user = item.reddit_session.get_redditor(item.author)
+    except urllib2.HTTPError as e:
+        if e.code == 404:
+            return fail_result
+        else:
+            raise
 
     # reddit gold check
     if condition.is_gold is not None:
