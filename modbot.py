@@ -173,6 +173,8 @@ def check_items(name, items, sr_dict, stop_time):
                 setattr(subreddit, 'last_'+name, item_time)
                 seen_subs.add(subreddit.name)
 
+            logging.debug('  Checking item %s', get_permalink(item))
+
             # check removal conditions, stop checking if any matched
             if check_conditions(subreddit, item,
                     [c for c in conditions if c.action == 'remove']):
@@ -254,14 +256,10 @@ def check_conditions(subreddit, item, conditions):
         conditions = [c for c in conditions
                           if c.subject == 'submission' or
                              c.subject == 'both']
-        logging.debug('      Checking submission titled "%s"',
-                        item.title.encode('ascii', 'ignore'))
     elif isinstance(item, praw.objects.Comment):
         conditions = [c for c in conditions
                           if c.subject == 'comment' or
                              c.subject == 'both']
-        logging.debug('      Checking comment by user %s',
-                        item.author.name)
 
     # sort the conditions so the easiest ones are checked first
     conditions.sort(key=condition_complexity)
@@ -334,17 +332,6 @@ def check_condition(item, condition):
     if not test_string:
         test_string = ''
 
-    if condition.inverse:
-        logging.debug('        Check #%s: "%s" NOT match ^%s$',
-                        condition.id,
-                        '/'.join(test_string).encode('ascii', 'ignore'),
-                        condition.value.encode('ascii', 'ignore').lower())
-    else:
-        logging.debug('        Check #%s: "%s" match ^%s$',
-                        condition.id,
-                        '/'.join(test_string).encode('ascii', 'ignore'),
-                        condition.value.encode('ascii', 'ignore').lower())
-
     if isinstance(test_string, list):
         for test in test_string:
             match = re.search('^'+condition.value+'$',
@@ -386,22 +373,17 @@ def check_condition(item, condition):
     # check user conditions if necessary
     if satisfied:
         satisfied = check_user_conditions(item, condition)
-        logging.debug('          User condition result = %s', satisfied)
 
     # make sure all sub-conditions are satisfied as well
     if satisfied:
-        if condition.additional_conditions:
-            logging.debug('        Checking sub-conditions:')
         for sub_condition in condition.additional_conditions:
             sub_match = check_condition(item, sub_condition)
             if not sub_match:
                 satisfied = False
                 break
-        if condition.additional_conditions:
-            logging.debug('        Sub-condition result = %s', satisfied)
 
-    logging.debug('        Result = %s in %s',
-                    satisfied, elapsed_since(start_time))
+    logging.debug('    Condition #%s, result %s in %s',
+                    condition.id, satisfied, elapsed_since(start_time))
     if satisfied:
         if not condition.inverse:
             return match
@@ -639,7 +621,7 @@ def get_meme_name(item):
 def elapsed_since(start_time):
     """Returns a timedelta for how much time has passed since start_time."""
     elapsed = time() - start_time
-    return timedelta(seconds=round(elapsed))
+    return timedelta(seconds=elapsed)
 
 
 def condition_complexity(condition):
