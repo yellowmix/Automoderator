@@ -17,6 +17,16 @@ from models import cfg_file, path_to_cfg, session, Subreddit, Condition, \
 r = None
 
 
+def log_request(req_type, num_reqs=1):
+    """Logs a reddit request."""
+    if not hasattr(log_request, 'counts'):
+        log_request.counts = dict()
+
+    if req_type in log_request.counts:
+        log_request.counts[req_type] += num_reqs
+    else:
+        log_request.counts[req_type] = num_reqs
+
 def perform_action(subreddit, item, condition, matchobj):
     """Performs the action for the condition(s).
     
@@ -70,6 +80,8 @@ def perform_action(subreddit, item, condition, matchobj):
     elif condition.action == 'set_flair':
         item.set_flair(flair_text, flair_class)
 
+    log_request(condition.action)
+
     if comment:
         # put together the comment parts for "public" comments
         if condition.comment_method in ['comment', 'message']:
@@ -82,14 +94,18 @@ def perform_action(subreddit, item, condition, matchobj):
         # deliver the comment
         if condition.comment_method == 'comment':
             post_comment(item, comment)
+            log_request('comment')
+            log_request('distinguish')
         elif condition.comment_method == 'modmail':
             r.compose_message('/r/'+subreddit.name,
                               'AutoModerator condition matched',
                               get_permalink(item)+'\n\n'+comment)
+            log_request('modmail')
         elif condition.comment_method == 'message':
             r.compose_message(item.author.name,
                               'AutoModerator condition matched',
                               get_permalink(item)+'\n\n'+comment)
+            log_request('message')
 
     # log the action taken
     action_log = ActionLog()
@@ -219,6 +235,7 @@ def check_items(name, items, sr_dict, stop_time):
                     session.add(entry)
                     session.commit()
                     logging.info('  Re-approved %s', entry.permalink)
+                    log_request('reapprove')
                             
         session.commit()
     except Exception as e:
@@ -227,6 +244,7 @@ def check_items(name, items, sr_dict, stop_time):
 
     logging.info('  Checked %s items in %s',
             item_count, elapsed_since(start_time))
+    log_request('listing', item_count / 100 + 1)
 
 
 def filter_conditions(name, conditions):
@@ -432,6 +450,7 @@ def check_user_conditions(item, condition):
     # get user info
     try:
         user = item.reddit_session.get_redditor(item.author)
+        log_request('user')
     except urllib2.HTTPError as e:
         if e.code == 404:
             return fail_result
@@ -476,11 +495,13 @@ def user_has_rank(subreddit, user, rank):
         for mod in subreddit.get_moderators():
             mod_list.add(mod.name)
         user_has_rank.moderator_cache[sr_name] = mod_list
+        log_request('moderator_list')
 
         contrib_list = set()
         for contrib in subreddit.get_contributors():
             contrib_list.add(contrib.name)
         user_has_rank.contributor_cache[sr_name] = contrib_list
+        log_request('contributor_list')
 
     if user.name in user_has_rank.moderator_cache[sr_name]:
         if rank == 'moderator' or rank == 'contributor':
@@ -501,6 +522,7 @@ def user_is_shadowbanned(username):
     if not user_is_shadowbanned.user_cache:
         # would be better as a minimal multireddit
         page = r._request('http://www.reddit.com/r/mod/about/modqueue')
+        log_request('modqueue_html')
         soup = BeautifulSoup(page)
         results = soup.find_all(class_='spam')
 
@@ -517,6 +539,7 @@ def user_is_shadowbanned(username):
 
     # fall back to trying to load the user's overview
     user = r.get_redditor(username, fetch=False)
+    log_request('user')
     try: # try to get user overview
         list(user.get_overview(limit=1))
     except: # if that failed, they're probably shadowbanned
@@ -553,6 +576,7 @@ def respond_to_modmail(modmail, start_time):
         for i in cache:
             if datetime.utcfromtimestamp(i.created_utc) < item.created_utc:
                 done = True
+                log_request('modmail_listing', len(cache) / 100 + 1)
                 break
             if (i.dest.lower() == '#'+item.subreddit.name.lower() and
                     i.author.name == item.user and
@@ -577,6 +601,7 @@ def respond_to_modmail(modmail, start_time):
                 'please wait at least 5 minutes before messaging the mods, '
                 'this post would have been approved automatically even '
                 'without you sending this message.')
+            log_request('modmail')
 
 
 def get_meme_name(item):
@@ -695,11 +720,14 @@ def main():
         logging.info('Logging in as %s', cfg_file.get('reddit', 'username'))
         r.login(cfg_file.get('reddit', 'username'),
             cfg_file.get('reddit', 'password'))
+        log_request('login')
 
         subreddits = session.query(Subreddit).filter(
                         Subreddit.enabled == True).all()
         # force population of _mod_subs
         list(r.get_subreddit('mod').get_spam(limit=1))
+        log_request('listing')
+        log_request('mod_subs', len(r.user._mod_subs) / 100 + 1)
 
         # build sr_dict including only subs both in db and _mod_subs
         sr_dict = dict()
@@ -749,7 +777,10 @@ def main():
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
-    logging.info('Completed full run in %s', elapsed_since(start_time))
+    logging.info('Completed full run in %s (%s due to reddit requests - %s)',
+                    elapsed_since(start_time),
+                    timedelta(seconds=sum(log_request.counts.values())*2),
+                    log_request.counts)
 
 
 if __name__ == '__main__':
