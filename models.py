@@ -278,3 +278,17 @@ class AutoReapproval(Base):
     subreddit = relationship('Subreddit',
         backref=backref('auto_reapprovals', lazy='dynamic'))
 
+
+class UserCache(Base):
+    """Cached user data."""
+    __tablename__ = 'user_cache'
+
+    user = Column(String(255), nullable=False, primary_key=True)
+    is_gold = Column(Boolean)
+    is_shadowbanned = Column(Boolean)
+    created_utc = Column(DateTime)
+    link_karma = Column(Integer)
+    comment_karma = Column(Integer)
+    shadowbanned_last_check = Column(DateTime)
+    info_last_check = Column(DateTime)
+

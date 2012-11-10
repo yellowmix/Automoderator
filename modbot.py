@@ -1,6 +1,7 @@
 import re
 import logging, logging.config
 import urllib2
+from calendar import timegm
 from datetime import datetime, timedelta
 from time import time
 
@@ -11,7 +12,7 @@ from sqlalchemy.sql import and_
 from sqlalchemy.orm.exc import NoResultFound
 
 from models import cfg_file, path_to_cfg, session, Subreddit, Condition, \
-                   SubredditCondition, ActionLog, AutoReapproval
+                   SubredditCondition, ActionLog, AutoReapproval, UserCache
 
 # global reddit session
 r = None
@@ -448,14 +449,9 @@ def check_user_conditions(item, condition):
             return fail_result
 
     # get user info
-    try:
-        user = item.reddit_session.get_redditor(item.author)
-        log_request('user')
-    except urllib2.HTTPError as e:
-        if e.code == 404:
-            return fail_result
-        else:
-            raise
+    user = get_user_info(item.author.name, condition)
+    if user is None:
+        return fail_result
 
     # reddit gold check
     if condition.is_gold is not None:
@@ -546,6 +542,60 @@ def user_is_shadowbanned(username):
         return True
     return False
 user_is_shadowbanned.user_cache = dict()
+
+
+def get_user_info(username, condition):
+    """Gets user info from cache, or from reddit if not cached or expired."""
+    global r
+
+    try:
+        cache_row = (session.query(UserCache)
+                        .filter(UserCache.user == username)
+                        .one())
+        # see if the condition includes a check that expires
+        if (condition.is_gold or
+                condition.link_karma or
+                condition.comment_karma or
+                condition.combined_karma):
+            expiry = timedelta(days=1)
+        else:
+            expiry = None
+
+        # if not past the expiry, return cached data
+        if (not expiry or
+                datetime.utcnow() - cache_row.info_last_check < expiry):
+            cached = r.get_redditor(username, fetch=False)
+            cached.is_gold = cache_row.is_gold
+            cached.created_utc = timegm(cache_row.created_utc.timetuple())
+            cached.link_karma = cache_row.link_karma
+            cached.comment_karma = cache_row.comment_karma
+            
+            return cached
+    except NoResultFound:
+        cache_row = UserCache()
+        cache_row.user = username
+        session.add(cache_row)
+
+    # fetch the user's info from reddit
+    try:
+        user = r.get_redditor(username)
+        log_request('user')
+
+        # save to cache
+        cache_row.is_gold = user.is_gold
+        cache_row.created_utc = datetime.utcfromtimestamp(user.created_utc)
+        cache_row.link_karma = user.link_karma
+        cache_row.comment_karma = user.comment_karma
+        cache_row.info_last_check = datetime.utcnow()
+        session.commit()
+    except urllib2.HTTPError as e:
+        if e.code == 404:
+            # weird case where the user is deleted but API still shows username
+            return None
+        else:
+            raise
+
+    return user
 
 
 def get_permalink(item):
