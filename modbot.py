@@ -58,8 +58,8 @@ def perform_action(subreddit, item, condition, matchobj):
         comment = condition.comment
         match = matchobj
 
-    # abort if it's an alert, removal, or set_flair that's already triggered
-    if condition.action in ['alert', 'remove', 'set_flair']:
+    # abort if it's an alert/report/removal/set_flair that's already triggered
+    if condition.action in ['alert', 'report', 'remove', 'set_flair']:
         try:
             session.query(ActionLog).filter(
                 and_(ActionLog.permalink == get_permalink(item),
@@ -80,6 +80,8 @@ def perform_action(subreddit, item, condition, matchobj):
         item.approve()
     elif condition.action == 'set_flair':
         item.set_flair(flair_text, flair_class)
+    elif condition.action == 'report':
+        item.report()
 
     log_request(condition.action)
 
@@ -208,6 +210,10 @@ def check_items(name, items, sr_dict, stop_time):
             # check alert conditions
             check_conditions(subreddit, item,
                     [c for c in conditions if c.action == 'alert'])
+
+            # check report conditions
+            check_conditions(subreddit, item,
+                    [c for c in conditions if c.action == 'report'])
 
             # if doing reports, check auto-reapproval if enabled
             if (name == 'report' and subreddit.auto_reapprove and
@@ -427,7 +433,7 @@ def check_user_conditions(item, condition):
     # returning True will result in the action being performed
     # so when removing or alerting, return True if they DON'T meet user reqs
     # but for approving and flair we return True if they DO meet it
-    if condition.action in ['remove', 'alert']:
+    if condition.action in ['remove', 'alert', 'report']:
         fail_result = True
     elif condition.action in ['approve', 'set_flair']:
         fail_result = False

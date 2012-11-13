@@ -153,6 +153,7 @@ class Condition(Base):
                          'remove',
                          'alert',
                          'set_flair',
+                         'report',
                          name='action'))
     spam = Column(Boolean)
     set_flair_text = Column(Text)
@@ -197,6 +198,7 @@ class SubredditCondition(Base):
                          'remove',
                          'alert',
                          'set_flair',
+                         'report',
                          name='action'))
     spam = Column(Boolean)
     set_flair_text = Column(Text)
@@ -251,6 +253,7 @@ class ActionLog(Base):
                          'remove',
                          'alert',
                          'set_flair',
+                         'report',
                          name='action'))
     matched_condition = Column(Integer, ForeignKey('conditions.id'))
 
