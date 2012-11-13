@@ -260,6 +260,7 @@ def filter_conditions(name, conditions):
         return [c for c in conditions if c.num_reports < 1]
     elif name == 'report':
         return [c for c in conditions if
+                c.action != 'report' and
                 (c.action != 'approve' or c.num_reports > 0) and
                 c.is_shadowbanned != True]
     elif name == 'submission':
