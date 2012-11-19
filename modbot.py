@@ -156,7 +156,7 @@ def post_comment(item, comment):
         response.distinguish()
 
 
-def check_items(name, items, sr_dict, stop_time):
+def check_items(name, items, sr_dict, cond_dict, stop_time):
     """Checks the items generator for any matching conditions."""
     item_count = 0
     start_time = time()
@@ -175,8 +175,7 @@ def check_items(name, items, sr_dict, stop_time):
                 break
 
             subreddit = sr_dict[item.subreddit.display_name.lower()]
-            conditions = subreddit.conditions.all()
-            conditions = filter_conditions(name, conditions)
+            conditions = cond_dict[item.subreddit.display_name.lower()][name]
 
             # don't need to check for shadowbanned unless we're in spam
             if name == 'spam':
@@ -788,9 +787,16 @@ def main():
 
         # build sr_dict including only subs both in db and _mod_subs
         sr_dict = dict()
+        cond_dict = dict()
         for subreddit in subreddits:
             if subreddit.name.lower() in r.user._mod_subs:
                 sr_dict[subreddit.name.lower()] = subreddit
+                conditions = subreddit.conditions.all()
+                cond_dict[subreddit.name.lower()] = {
+                    'report': filter_conditions('report', conditions),
+                    'spam': filter_conditions('spam', conditions),
+                    'submission': filter_conditions('submission', conditions),
+                    'comment': filter_conditions('comment', conditions) }
 
     except Exception as e:
         logging.error('  ERROR: %s', e)
@@ -802,7 +808,7 @@ def main():
         report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
                                             'report_backlog_limit_hours')))
         stop_time = datetime.utcnow() - report_backlog_limit
-        check_items('report', items, sr_dict, stop_time)
+        check_items('report', items, sr_dict, cond_dict, stop_time)
 
     # check spam
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'spam')
@@ -810,7 +816,7 @@ def main():
         items = queue_subreddit.get_modqueue(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_spam))
                      .filter(Subreddit.enabled == True).one()[0])
-        check_items('spam', items, sr_dict, stop_time)
+        check_items('spam', items, sr_dict, cond_dict, stop_time)
 
     # check new submissions
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'submission')
@@ -818,7 +824,7 @@ def main():
         items = queue_subreddit.get_new_by_date(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_submission))
                      .filter(Subreddit.enabled == True).one()[0])
-        check_items('submission', items, sr_dict, stop_time)
+        check_items('submission', items, sr_dict, cond_dict, stop_time)
 
     # check new comments
     queue_subreddit = get_multireddit_for_queue(sr_dict, 'comment')
@@ -826,7 +832,7 @@ def main():
         items = queue_subreddit.get_comments(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_comment))
                      .filter(Subreddit.enabled == True).one()[0])
-        check_items('comment', items, sr_dict, stop_time)
+        check_items('comment', items, sr_dict, cond_dict, stop_time)
 
     # respond to modmail
     try:
