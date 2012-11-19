@@ -739,7 +739,7 @@ def condition_complexity(condition):
     return complexity
 
 
-def get_multireddit_for_queue(sr_dict, queue):
+def get_multireddit_for_queue(sr_dict, cond_dict, queue):
     """Returns a multireddit for a particular item queue."""
     global r
 
@@ -754,9 +754,7 @@ def get_multireddit_for_queue(sr_dict, queue):
             if subreddit.reported_comments_only:
                 continue
 
-        conditions = subreddit.conditions.all()
-        conditions = filter_conditions(queue, conditions)
-        if len(conditions) > 0:
+        if len(cond_dict[subreddit.name.lower()][queue]) > 0:
             relevant_subreddits.add(subreddit.name)
 
     if len(relevant_subreddits) > 0:
@@ -802,7 +800,7 @@ def main():
         logging.error('  ERROR: %s', e)
 
     # check reports
-    queue_subreddit = get_multireddit_for_queue(sr_dict, 'report')
+    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'report')
     if queue_subreddit:
         items = queue_subreddit.get_reports(limit=1000)
         report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
@@ -811,7 +809,7 @@ def main():
         check_items('report', items, sr_dict, cond_dict, stop_time)
 
     # check spam
-    queue_subreddit = get_multireddit_for_queue(sr_dict, 'spam')
+    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'spam')
     if queue_subreddit:
         items = queue_subreddit.get_modqueue(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_spam))
@@ -819,7 +817,7 @@ def main():
         check_items('spam', items, sr_dict, cond_dict, stop_time)
 
     # check new submissions
-    queue_subreddit = get_multireddit_for_queue(sr_dict, 'submission')
+    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'submission')
     if queue_subreddit:
         items = queue_subreddit.get_new_by_date(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_submission))
@@ -827,7 +825,7 @@ def main():
         check_items('submission', items, sr_dict, cond_dict, stop_time)
 
     # check new comments
-    queue_subreddit = get_multireddit_for_queue(sr_dict, 'comment')
+    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'comment')
     if queue_subreddit:
         items = queue_subreddit.get_comments(limit=1000)
         stop_time = (session.query(func.max(Subreddit.last_comment))
