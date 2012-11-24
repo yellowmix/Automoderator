@@ -16,6 +16,11 @@ from models import cfg_file, path_to_cfg, session, Subreddit, Condition, \
 
 # global reddit session
 r = None
+# which queues to check and the function to call
+QUEUES = {'report': 'get_reports',
+          'spam': 'get_modqueue',
+          'submission': 'get_new_by_date',
+          'comment': 'get_comments'}
 
 
 def log_request(req_type, num_reqs=1):
@@ -739,10 +744,8 @@ def condition_complexity(condition):
     return complexity
 
 
-def get_multireddit_for_queue(sr_dict, cond_dict, queue):
-    """Returns a multireddit for a particular item queue."""
-    global r
-
+def get_subreddits_for_queue(sr_dict, cond_dict, queue):
+    """Returns a list of subreddits for a particular item queue."""
     relevant_subreddits = set()
 
     for subreddit in sr_dict.values():
@@ -757,10 +760,48 @@ def get_multireddit_for_queue(sr_dict, cond_dict, queue):
         if len(cond_dict[subreddit.name.lower()][queue]) > 0:
             relevant_subreddits.add(subreddit.name)
 
-    if len(relevant_subreddits) > 0:
-        return r.get_subreddit('+'.join(relevant_subreddits))
-    else:
-        return None
+    return list(relevant_subreddits)
+
+
+def check_queues(sr_dict, cond_dict):
+    """Checks all the queues for new items to process."""
+    global r
+
+    for queue in QUEUES:
+        subreddits = get_subreddits_for_queue(sr_dict, cond_dict, queue)
+        if not subreddits:
+            continue
+
+        if queue == 'report':
+            report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
+                                                'report_backlog_limit_hours')))
+            stop_time = datetime.utcnow() - report_backlog_limit
+        else:
+            last_attr = getattr(Subreddit, 'last_'+queue)
+            stop_time = (session.query(func.max(last_attr))
+                         .filter(Subreddit.enabled == True).one()[0])
+
+        # issues with request being too long at multireddit of ~3000 chars
+        # so split into multiple checks if it's longer than that
+        multireddits = []
+        current_multi = []
+        current_len = 0
+        for sub in subreddits:
+            if current_len > 3000:
+                multireddits.append('+'.join(current_multi))
+                current_multi = []
+                current_len = 0
+            current_multi.append(sub)
+            current_len += len(sub) + 1
+        multireddits.append('+'.join(current_multi))
+
+        # fetch and process the items for each multireddit
+        for multi in multireddits:
+            queue_subreddit = r.get_subreddit(multi)
+            if queue_subreddit:
+                queue_method = getattr(queue_subreddit, QUEUES[queue])
+                items = queue_method(limit=1000)
+                check_items(queue, items, sr_dict, cond_dict, stop_time)
 
 
 def main():
@@ -799,38 +840,7 @@ def main():
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
-    # check reports
-    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'report')
-    if queue_subreddit:
-        items = queue_subreddit.get_reports(limit=1000)
-        report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
-                                            'report_backlog_limit_hours')))
-        stop_time = datetime.utcnow() - report_backlog_limit
-        check_items('report', items, sr_dict, cond_dict, stop_time)
-
-    # check spam
-    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'spam')
-    if queue_subreddit:
-        items = queue_subreddit.get_modqueue(limit=1000)
-        stop_time = (session.query(func.max(Subreddit.last_spam))
-                     .filter(Subreddit.enabled == True).one()[0])
-        check_items('spam', items, sr_dict, cond_dict, stop_time)
-
-    # check new submissions
-    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'submission')
-    if queue_subreddit:
-        items = queue_subreddit.get_new_by_date(limit=1000)
-        stop_time = (session.query(func.max(Subreddit.last_submission))
-                     .filter(Subreddit.enabled == True).one()[0])
-        check_items('submission', items, sr_dict, cond_dict, stop_time)
-
-    # check new comments
-    queue_subreddit = get_multireddit_for_queue(sr_dict, cond_dict, 'comment')
-    if queue_subreddit:
-        items = queue_subreddit.get_comments(limit=1000)
-        stop_time = (session.query(func.max(Subreddit.last_comment))
-                     .filter(Subreddit.enabled == True).one()[0])
-        check_items('comment', items, sr_dict, cond_dict, stop_time)
+    check_queues(sr_dict, cond_dict)
 
     # respond to modmail
     try:
