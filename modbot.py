@@ -338,7 +338,7 @@ def check_condition(item, condition):
                 if condition.attribute == 'media_user':
                     test_string = item.media['oembed']['author_name']
                 elif condition.attribute == 'media_title':
-                    test_string = item.media['oembed']['description']
+                    test_string = item.media['oembed']['title']
                 elif condition.attribute == 'media_description':
                     test_string = item.media['oembed']['description']
             except KeyError:
