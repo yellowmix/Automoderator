@@ -87,6 +87,8 @@ class Condition(Base):
         must be set to at least 1
     auto_reapproving - Whether the num_reports condition should apply only
         during auto-reapproving, only before, or both (if null)
+    is_reply - Applies only to comments. If True, comment must be a reply
+        to another comment. If False, comment must be top-level.
     is_gold - Whether the author has reddit gold or not
     is_shadowbanned - Whether the author is "shadowbanned" or not
     account_age - Account age condition (in days) for the item's author
@@ -138,6 +140,7 @@ class Condition(Base):
     value = Column(Text, nullable=False)
     num_reports = Column(Integer)
     auto_reapproving = Column(Boolean, default=False)
+    is_reply = Column(Boolean)
     is_gold = Column(Boolean)
     is_shadowbanned = Column(Boolean)
     account_age = Column(Integer)

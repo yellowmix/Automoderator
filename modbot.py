@@ -400,6 +400,13 @@ def check_condition(item, condition):
 
         satisfied = (total_reports >= condition.num_reports)
 
+    # check whether it's a reply or top-level comment if necessary
+    if (satisfied and
+            isinstance(item, praw.objects.Comment) and
+            condition.is_reply is not None and
+            condition.is_reply != item.parent_id.startswith('t1_')):
+        satisfied = False
+
     # check user conditions if necessary
     if satisfied:
         satisfied = check_user_conditions(item, condition)
