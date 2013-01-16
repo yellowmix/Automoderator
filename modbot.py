@@ -790,11 +790,13 @@ def check_queues(sr_dict, cond_dict):
 
         # issues with request being too long at multireddit of ~3000 chars
         # so split into multiple checks if it's longer than that
+        # split comment checks into groups of max 40 subreddits as well
         multireddits = []
         current_multi = []
         current_len = 0
         for sub in subreddits:
-            if current_len > 3000:
+            if (current_len > 3000 or
+                    queue == 'comment' and len(current_multi) >= 40):
                 multireddits.append('+'.join(current_multi))
                 current_multi = []
                 current_len = 0
