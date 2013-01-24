@@ -110,15 +110,17 @@ def perform_action(subreddit, item, condition, matchobj):
                               get_permalink(item)+'\n\n'+comment)
             log_request('modmail')
         elif condition.comment_method == 'message':
-            r.compose_message(item.author.name,
-                              'AutoModerator condition matched',
-                              get_permalink(item)+'\n\n'+comment)
-            log_request('message')
+            if item.author:
+                r.compose_message(item.author.name,
+                                  'AutoModerator condition matched',
+                                  get_permalink(item)+'\n\n'+comment)
+                log_request('message')
 
     # log the action taken
     action_log = ActionLog()
     action_log.subreddit_id = subreddit.id
-    action_log.user = item.author.name
+    if item.author:
+        action_log.user = item.author.name
     action_log.permalink = get_permalink(item)
     action_log.created_utc = datetime.utcfromtimestamp(item.created_utc)
     action_log.action_time = datetime.utcnow()
@@ -134,10 +136,15 @@ def perform_action(subreddit, item, condition, matchobj):
                         condition.action,
                         item.title.encode('ascii', 'ignore'))
     elif isinstance(item, praw.objects.Comment):
-        logging.info('  /r/%s: %s comment by user %s',
-                        subreddit.name,
-                        condition.action,
-                        item.author.name)
+        if item.author:
+            logging.info('  /r/%s: %s comment by user %s',
+                            subreddit.name,
+                            condition.action,
+                            item.author.name)
+        else:
+            logging.info('  /r/%s: %s comment by deleted user',
+                            subreddit.name,
+                            condition.action)
 
     session.add(action_log)
     session.commit()
