@@ -1,8 +1,14 @@
-# if using sqlite:
-#   set system to sqlite
-#   database to the path to the database file (relative or absolute)
-#   host, username, and password will all be ignored
+# AutoModerator Configuration File
+# WARNING: This file contains passwords. Be sure to take appropriate precautions
+#          (e.g. Add to .gitignore or .hgignore and ensure only modbot user has
+#          access)
 
+# Database Configuration
+#   system: database system type (mysql, postgresql, or sqlite)
+#   host: sql server ip or hostname
+#   database: database name (sqlite: relative or absolute database file path)
+#   username: server/database username (sqlite: ignored)
+#   password: server/database password (sqlite: ignored)
 [database]
 system = postgresql
 host = localhost
@@ -10,12 +16,21 @@ database = database_name
 username = database_username
 password = database_password
 
+# Reddit Configuration
+# user_agent: User agent reported by praw (username is recommended unless you 
+#             know what you are doing. See: https://github.com/reddit/reddit/wiki/API)
+# username: Reddit username to use
+# password: Reddit password to use
+# report_backlog_limit_hours: Number of hours to go back when retreiving mod
+#                             report queue
 [reddit]
-user_agent = user_agent (your bot's username is fine, DO NOT FAKE)
+user_agent = reddit_username
 username = reddit_username
 password = reddit_password
 report_backlog_limit_hours = 48
 
+# Log File Configuration
+# For details, see: http://docs.python.org/2/library/logging.config.html
 [loggers]
 keys=root
 
