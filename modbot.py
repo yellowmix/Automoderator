@@ -18,7 +18,7 @@ from models import cfg_file, path_to_cfg, session, Subreddit, Condition, \
 r = None
 # which queues to check and the function to call
 QUEUES = {'report': 'get_reports',
-          'spam': 'get_modqueue',
+          'spam': 'get_mod_queue',
           'submission': 'get_new_by_date',
           'comment': 'get_comments'}
 
@@ -105,15 +105,15 @@ def perform_action(subreddit, item, condition, matchobj):
             log_request('comment')
             log_request('distinguish')
         elif condition.comment_method == 'modmail':
-            r.compose_message('/r/'+subreddit.name,
-                              'AutoModerator condition matched',
-                              get_permalink(item)+'\n\n'+comment)
+            r.send_message('/r/'+subreddit.name,
+                          'AutoModerator condition matched',
+                          get_permalink(item)+'\n\n'+comment)
             log_request('modmail')
         elif condition.comment_method == 'message':
             if item.author:
-                r.compose_message(item.author.name,
-                                  'AutoModerator condition matched',
-                                  get_permalink(item)+'\n\n'+comment)
+                r.send_message(item.author.name,
+                              'AutoModerator condition matched',
+                              get_permalink(item)+'\n\n'+comment)
                 log_request('message')
 
     # log the action taken
@@ -860,7 +860,7 @@ def main():
 
     # respond to modmail
     try:
-        respond_to_modmail(r.user.get_modmail(), start_utc)
+        respond_to_modmail(r.get_mod_mail(), start_utc)
     except Exception as e:
         logging.error('  ERROR: %s', e)
 
