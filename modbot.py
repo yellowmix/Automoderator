@@ -786,15 +786,6 @@ def check_queues(sr_dict, cond_dict):
         if not subreddits:
             continue
 
-        if queue == 'report':
-            report_backlog_limit = timedelta(hours=int(cfg_file.get('reddit',
-                                                'report_backlog_limit_hours')))
-            stop_time = datetime.utcnow() - report_backlog_limit
-        else:
-            last_attr = getattr(Subreddit, 'last_'+queue)
-            stop_time = (session.query(func.max(last_attr))
-                         .filter(Subreddit.enabled == True).one()[0])
-
         # issues with request being too long at multireddit of ~3000 chars
         # so split into multiple checks if it's longer than that
         # split comment checks into groups of max 40 subreddits as well
@@ -804,16 +795,26 @@ def check_queues(sr_dict, cond_dict):
         for sub in subreddits:
             if (current_len > 3000 or
                     queue == 'comment' and len(current_multi) >= 40):
-                multireddits.append('+'.join(current_multi))
+                multireddits.append(current_multi)
                 current_multi = []
                 current_len = 0
             current_multi.append(sub)
             current_len += len(sub) + 1
-        multireddits.append('+'.join(current_multi))
+        multireddits.append(current_multi)
 
         # fetch and process the items for each multireddit
         for multi in multireddits:
-            queue_subreddit = r.get_subreddit(multi)
+            if queue == 'report':
+                report_backlog_limit = timedelta(
+                        hours=int(cfg_file.get('reddit',
+                                               'report_backlog_limit_hours')))
+                stop_time = datetime.utcnow() - report_backlog_limit
+            else:
+                stop_time = max([getattr(sr, 'last_'+queue)
+                                 for sr in sr_dict.values()
+                                 if sr.name in multi])
+
+            queue_subreddit = r.get_subreddit('+'.join(multi))
             if queue_subreddit:
                 queue_method = getattr(queue_subreddit, QUEUES[queue])
                 items = queue_method(limit=1000)
