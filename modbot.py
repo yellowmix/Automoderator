@@ -836,16 +836,15 @@ def main():
 
         subreddits = session.query(Subreddit).filter(
                         Subreddit.enabled == True).all()
-        # force population of _mod_subs
-        list(r.get_subreddit('mod').get_spam(limit=1))
-        log_request('listing')
-        log_request('mod_subs', len(r.user._mod_subs) / 100 + 1)
+        modded_subs = list([s.display_name.lower()
+                            for s in r.get_my_moderation(limit=None)])
+        log_request('mod_subs', len(modded_subs) / 100 + 1)
 
-        # build sr_dict including only subs both in db and _mod_subs
+        # build sr_dict including only subs both in db and modded_subs
         sr_dict = dict()
         cond_dict = dict()
         for subreddit in subreddits:
-            if subreddit.name.lower() in r.user._mod_subs:
+            if subreddit.name.lower() in modded_subs:
                 sr_dict[subreddit.name.lower()] = subreddit
                 conditions = subreddit.conditions.all()
                 cond_dict[subreddit.name.lower()] = {
