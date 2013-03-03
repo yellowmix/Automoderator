@@ -2,7 +2,9 @@ import re
 import logging, logging.config
 import urllib2
 from calendar import timegm
+from collections import Counter
 from datetime import datetime, timedelta
+from math import ceil
 from time import time
 
 import praw
@@ -174,6 +176,7 @@ def post_comment(item, comment):
 def check_items(name, items, sr_dict, cond_dict, stop_time):
     """Checks the items generator for any matching conditions."""
     item_count = 0
+    comment_counts = Counter()
     start_time = time()
     seen_subs = set()
 
@@ -201,6 +204,8 @@ def check_items(name, items, sr_dict, cond_dict, stop_time):
                     condition.check_shadowbanned = False
 
             item_count += 1
+            if name == 'comment':
+                comment_counts[item.subreddit.display_name.lower()] += 1
 
             if subreddit.name not in seen_subs:
                 setattr(subreddit, 'last_'+name, item_time)
@@ -262,6 +267,17 @@ def check_items(name, items, sr_dict, cond_dict, stop_time):
     except Exception as e:
         logging.error('  ERROR: %s', e)
         session.rollback()
+
+    # This isn't really correct, since we don't collect any 0 samples
+    # but the difference won't matter much in practice
+    for subreddit in comment_counts:
+        prev_total = (sr_dict[subreddit].avg_comments * 
+                     sr_dict[subreddit].avg_comments_samples)
+        new_avg = ((prev_total + comment_counts[subreddit]) /
+                   (sr_dict[subreddit].avg_comments_samples + 1))
+        sr_dict[subreddit].avg_comments = new_avg
+        sr_dict[subreddit].avg_comments_samples += 1
+    session.commit()
 
     logging.info('  Checked %s items in %s',
             item_count, elapsed_since(start_time))
@@ -792,23 +808,42 @@ def check_queues(sr_dict, cond_dict):
         if not subreddits:
             continue
 
-        # issues with request being too long at multireddit of ~3000 chars
-        # so split into multiple checks if it's longer than that
-        # split comment checks into groups of max 40 subreddits as well
         multireddits = []
-        current_multi = []
-        current_len = 0
-        for sub in subreddits:
-            if (current_len > 3000 or
-                    queue == 'comment' and
-                    len(current_multi) >= int(cfg_file.get('reddit',
-                                              'comment_multireddit_size'))):
-                multireddits.append(current_multi)
-                current_multi = []
-                current_len = 0
-            current_multi.append(sub)
-            current_len += len(sub) + 1
-        multireddits.append(current_multi)
+
+        if queue == 'comment':
+            # split comment checks into groups, using max size from cfg
+            # create the number of empty multireddits that we'll need
+            num_multis = int(ceil(len(subreddits) / float(cfg_file.get('reddit',
+                                                'comment_multireddit_size'))))
+            for i in range(num_multis):
+                multireddits.append([])
+            multi_avg_comments = Counter()
+
+            for sub in subreddits:
+                # find the index with the lowest total
+                lowest_index = 0
+                lowest_sum = multi_avg_comments[0]
+                for i in range(1, num_multis):
+                    if multi_avg_comments[i] < lowest_sum:
+                        lowest_index = i
+                        lowest_sum = multi_avg_comments[i]
+
+                # add this subreddit to that multi
+                multireddits[lowest_index].append(sub)
+                multi_avg_comments[lowest_index] += sr_dict[sub.lower()].avg_comments
+        else:
+            # issues with request being too long at multireddit of ~3000 chars
+            # so split into multiple checks if it's longer than that
+            current_multi = []
+            current_len = 0
+            for sub in subreddits:
+                if current_len > 3000:
+                    multireddits.append(current_multi)
+                    current_multi = []
+                    current_len = 0
+                current_multi.append(sub)
+                current_len += len(sub) + 1
+            multireddits.append(current_multi)
 
         # fetch and process the items for each multireddit
         for multi in multireddits:

@@ -37,6 +37,9 @@ class Subreddit(Base):
     enabled - Subreddit will not be checked if False
     last_submission - The newest unfiltered submission the bot has seen
     last_spam - The newest filtered submission the bot has seen
+    last_comment - The newest comment the bot has seen
+    avg_comments - The average number of comments seen on each run
+    avg_comments_samples - The number of samples the average is using
     report_threshold - Any items with at least this many reports will trigger
         a mod-mail alert
     auto_reapprove - If True, bot will reapprove any reported submissions
@@ -63,6 +66,8 @@ class Subreddit(Base):
     last_submission = Column(DateTime, nullable=False)
     last_spam = Column(DateTime, nullable=False)
     last_comment = Column(DateTime, nullable=False)
+    avg_comments = Column(Integer, nullable=False, default=0)
+    avg_comments_samples = Column(Integer, nullable=False, default=0)
     auto_reapprove = Column(Boolean, nullable=False, default=False)
     check_all_conditions = Column(Boolean, nullable=False, default=False)
     reported_comments_only = Column(Boolean, nullable=False,
