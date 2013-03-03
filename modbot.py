@@ -585,7 +585,8 @@ def get_user_info(username, condition):
                 condition.link_karma or
                 condition.comment_karma or
                 condition.combined_karma):
-            expiry = timedelta(days=1)
+            expiry = timedelta(hours=int(cfg_file.get('reddit',
+                                           'user_cache_expiry_hours')))
         else:
             expiry = None
 
@@ -640,8 +641,9 @@ def get_permalink(item):
 def respond_to_modmail(modmail, start_time):
     """Responds to modmail if any submitters sent one before approval."""
     cache = list()
-    # respond to any modmail sent in the last 5 mins
-    time_window = timedelta(minutes=5)
+    # respond to any modmail sent in the configured window of time
+    time_window = timedelta(minutes=int(cfg_file.get('reddit',
+                                   'modmail_response_window_mins')))
     approvals = session.query(ActionLog).filter(
                     and_(ActionLog.action == 'approve',
                          ActionLog.action_time >= start_time - time_window)
@@ -676,9 +678,10 @@ def respond_to_modmail(modmail, start_time):
         if found:
             found.reply('Your submission has been approved automatically by '+
                 cfg_file.get('reddit', 'username')+'. For future submissions '
-                'please wait at least 5 minutes before messaging the mods, '
-                'this post would have been approved automatically even '
-                'without you sending this message.')
+                'please wait at least '+cfg_file.get('reddit',
+                'modmail_response_window_mins')+' minutes before messaging '
+                'the mods, this post would have been approved automatically '
+                'even without you sending this message.')
             log_request('modmail')
 
 
@@ -797,7 +800,9 @@ def check_queues(sr_dict, cond_dict):
         current_len = 0
         for sub in subreddits:
             if (current_len > 3000 or
-                    queue == 'comment' and len(current_multi) >= 40):
+                    queue == 'comment' and
+                    len(current_multi) >= int(cfg_file.get('reddit',
+                                              'comment_multireddit_size'))):
                 multireddits.append(current_multi)
                 current_multi = []
                 current_len = 0
@@ -839,6 +844,7 @@ def main():
 
         subreddits = session.query(Subreddit).filter(
                         Subreddit.enabled == True).all()
+        logging.info('Getting list of moderated subreddits')
         modded_subs = list([s.display_name.lower()
                             for s in r.get_my_moderation(limit=None)])
         log_request('mod_subs', len(modded_subs) / 100 + 1)

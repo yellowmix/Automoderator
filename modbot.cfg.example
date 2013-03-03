@@ -23,11 +23,19 @@ password = database_password
 # password: Reddit password to use
 # report_backlog_limit_hours: Number of hours to go back when retreiving mod
 #                             report queue
+# user_cache_expiry_hours: Number of hours to use cached user data before re-fetching
+# modmail_response_window_mins: Number of minutes to look back in modmail
+#                               for users asking about their post being
+#                               filtered when the bot automatically approved it
+# comment_multireddit_size: Maximum number of subreddits for each comment multireddit
 [reddit]
 user_agent = reddit_username
 username = reddit_username
 password = reddit_password
 report_backlog_limit_hours = 48
+user_cache_expiry_hours = 24
+modmail_response_window_mins = 5
+comment_multireddit_size = 40
 
 # Log File Configuration
 # For details, see: http://docs.python.org/2/library/logging.config.html
