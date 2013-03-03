@@ -105,9 +105,12 @@ def perform_action(subreddit, item, condition, matchobj):
             log_request('comment')
             log_request('distinguish')
         elif condition.comment_method == 'modmail':
+            permalink = get_permalink(item)
+            if isinstance(item, praw.objects.Comment):
+                permalink += '?context=5'
             r.send_message('/r/'+subreddit.name,
                           'AutoModerator condition matched',
-                          get_permalink(item)+'\n\n'+comment)
+                          permalink+'\n\n'+comment)
             log_request('modmail')
         elif condition.comment_method == 'message':
             if item.author:
