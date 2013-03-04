@@ -567,7 +567,10 @@ def user_is_shadowbanned(username):
     try: # try to get user overview
         list(user.get_overview(limit=1))
     except: # if that failed, they're probably shadowbanned
+        user_is_shadowbanned.user_cache[username] = True
         return True
+
+    user_is_shadowbanned.user_cache[username] = False
     return False
 user_is_shadowbanned.user_cache = dict()
 
