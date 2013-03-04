@@ -21,19 +21,16 @@ r = None
 # which queues to check and the function to call
 QUEUES = {'report': 'get_reports',
           'spam': 'get_mod_queue',
-          'submission': 'get_new_by_date',
+          'submission': 'get_new',
           'comment': 'get_comments'}
 
 
 def log_request(req_type, num_reqs=1):
     """Logs a reddit request."""
     if not hasattr(log_request, 'counts'):
-        log_request.counts = dict()
+        log_request.counts = Counter()
 
-    if req_type in log_request.counts:
-        log_request.counts[req_type] += num_reqs
-    else:
-        log_request.counts[req_type] = num_reqs
+    log_request.counts[req_type] += num_reqs
 
 def perform_action(subreddit, item, condition, matchobj):
     """Performs the action for the condition(s).
@@ -310,12 +307,10 @@ def check_conditions(subreddit, item, conditions):
     """
     if isinstance(item, praw.objects.Submission):
         conditions = [c for c in conditions
-                          if c.subject == 'submission' or
-                             c.subject == 'both']
+                          if c.subject in ['submission', 'both']]
     elif isinstance(item, praw.objects.Comment):
         conditions = [c for c in conditions
-                          if c.subject == 'comment' or
-                             c.subject == 'both']
+                          if c.subject in ['comment', 'both']]
 
     # sort the conditions so the easiest ones are checked first
     conditions.sort(key=condition_complexity)
@@ -350,61 +345,50 @@ def check_condition(item, condition):
     None if not.
     """
     start_time = time()
-    test_string = None
+    test_strings = []
 
-    if condition.attribute == 'user':
-        if item.author:
-            test_string = item.author.name
+    if condition.attribute == 'user' and item.author:
+        test_strings = [item.author.name]
     elif (condition.attribute == 'body' and
             isinstance(item, praw.objects.Submission)):
-        test_string = item.selftext
-    elif condition.attribute.startswith('media_'):
-        if item.media:
-            try:
-                if condition.attribute == 'media_user':
-                    test_string = item.media['oembed']['author_name']
-                elif condition.attribute == 'media_title':
-                    test_string = item.media['oembed']['title']
-                elif condition.attribute == 'media_description':
-                    test_string = item.media['oembed']['description']
-            except KeyError:
-                test_string = ''
-        else:
-            test_string = ''
+        test_strings = [item.selftext]
+    elif condition.attribute.startswith('media_') and item.media:
+        try:
+            if condition.attribute == 'media_user':
+                test_strings = [item.media['oembed']['author_name']]
+            elif condition.attribute == 'media_title':
+                test_strings = [item.media['oembed']['title']]
+            elif condition.attribute == 'media_description':
+                test_strings = [item.media['oembed']['description']]
+        except KeyError:
+            pass
     elif condition.attribute == 'meme_name':
-        test_string = get_meme_name(item)
+        meme_name = get_meme_name(item)
+        if meme_name:
+            test_strings = [meme_name]
     elif condition.attribute == 'title+body':
         if isinstance(item, praw.objects.Submission):
-            test_string = [item.title, item.selftext]
+            test_strings = [item.title, item.selftext]
         else:
-            test_string = item.body
+            test_strings = [item.body]
     elif condition.attribute == 'url+body':
         if isinstance(item, praw.objects.Submission):
-            test_string = [item.url, item.selftext]
+            test_strings = [item.url, item.selftext]
         else:
-            test_string = item.body
-    else:
-        test_string = getattr(item, condition.attribute)
-    if not test_string:
-        test_string = ''
+            test_strings = [item.body]
+    elif getattr(item, condition.attribute, None):
+        test_strings = [getattr(item, condition.attribute)]
 
-    if isinstance(test_string, list):
-        for test in test_string:
-            match = re.search('^'+condition.value+'$',
-                        test.lower(),
-                        re.DOTALL|re.UNICODE|re.IGNORECASE)
-            if match:
-                break
-    else:
+    match = None
+    for test in test_strings:
         match = re.search('^'+condition.value+'$',
-                    test_string.lower(),
+                    test.lower(),
                     re.DOTALL|re.UNICODE|re.IGNORECASE)
+        if match:
+            break
 
-    if match:
-        satisfied = True
-    else:
-        satisfied = False
-
+    satisfied = bool(match)
+    
     # flip the result it's an inverse condition
     if condition.inverse:
         satisfied = not satisfied
@@ -469,8 +453,8 @@ def check_user_conditions(item, condition):
         return True
 
     # returning True will result in the action being performed
-    # so when removing or alerting, return True if they DON'T meet user reqs
-    # but for approving and flair we return True if they DO meet it
+    # so for remove, alert, or report return True if they DON'T meet user reqs
+    # but for approve and set_flair we return True if they DO meet it
     if condition.action in ['remove', 'alert', 'report']:
         fail_result = True
     elif condition.action in ['approve', 'set_flair']:
