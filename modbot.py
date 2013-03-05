@@ -659,7 +659,6 @@ def respond_to_modmail(modmail, start_time):
         for i in cache:
             if datetime.utcfromtimestamp(i.created_utc) < item.created_utc:
                 done = True
-                log_request('modmail_listing', len(cache) / 100 + 1)
                 break
             if (i.dest.lower() == '#'+item.subreddit.name.lower() and
                     i.author.name == item.user and
@@ -686,6 +685,8 @@ def respond_to_modmail(modmail, start_time):
                 'the mods, this post would have been approved automatically '
                 'even without you sending this message.')
             log_request('modmail')
+
+    log_request('modmail_listing', len(cache) / 100 + 1)
 
 
 def get_meme_name(item):
