@@ -52,6 +52,9 @@ class Subreddit(Base):
     reported_comments_only - If True, will only check conditions against
         reported comments. If False, checks all comments in the subreddit.
         Extremely-active subreddits are probably best set to True.
+    exclude_banned_modqueue - Should mirror the same setting's value on the
+        subreddit. Used to determine if it's necessary to check whether
+        submitters in the modqueue are shadowbanned or not.
     comment_header - Text prepended to all comments posted or messaged to
         users. Most useful if using check_all_conditions.
     comment_footer - Text appended to all comments posted or messaged to
@@ -70,8 +73,8 @@ class Subreddit(Base):
     avg_comments_samples = Column(Integer, nullable=False, default=0)
     auto_reapprove = Column(Boolean, nullable=False, default=False)
     check_all_conditions = Column(Boolean, nullable=False, default=False)
-    reported_comments_only = Column(Boolean, nullable=False,
-                                    default=False)
+    reported_comments_only = Column(Boolean, nullable=False, default=False)
+    exclude_banned_modqueue = Column(Boolean, nullable=False, default=False)
     comment_header = Column(Text)
     comment_footer = Column(Text)
 
