@@ -1,6 +1,6 @@
 # AutoModerator Configuration File
 # WARNING: This file contains passwords. Be sure to take appropriate precautions
-#          (e.g. Add to .gitignore or .hgignore and ensure only modbot user has
+#          (e.g. Add to .gitignore or .hgignore and ensure only bot user has
 #          access)
 
 # Database Configuration
@@ -9,12 +9,14 @@
 #   database: database name (sqlite: relative or absolute database file path)
 #   username: server/database username (sqlite: ignored)
 #   password: server/database password (sqlite: ignored)
+#   log_retention_days: number of days to keep entries in the log table
 [database]
 system = postgresql
 host = localhost
 database = database_name
 username = database_username
 password = database_password
+log_retention_days = 7
 
 # Reddit Configuration
 # user_agent: User agent reported by praw (username is recommended unless you 
@@ -23,19 +25,18 @@ password = database_password
 # password: Reddit password to use
 # report_backlog_limit_hours: Number of hours to go back when retreiving mod
 #                             report queue
-# user_cache_expiry_hours: Number of hours to use cached user data before re-fetching
-# modmail_response_window_mins: Number of minutes to look back in modmail
-#                               for users asking about their post being
-#                               filtered when the bot automatically approved it
-# comment_multireddit_size: Maximum number of subreddits for each comment multireddit
+# wiki_page_name: Name of the wiki page to read a subreddit's rules from
+# last_message: UTC timestamp of the newest message seen by update_settings.py
+#               This value will be modified by update_settings.py
+# disclaimer: Will be appended to any comments/messages sent by the bot
 [reddit]
 user_agent = reddit_username
 username = reddit_username
 password = reddit_password
 report_backlog_limit_hours = 48
-user_cache_expiry_hours = 24
-modmail_response_window_mins = 5
-comment_multireddit_size = 40
+wiki_page_name = %(username)s
+last_message = 1356998400
+disclaimer = *[I am a bot](/r/AutoModerator/comments/q11pu/what_is_automoderator/), and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose?to=%%2Fr%%2F{{subreddit}}) if you have any questions or concerns.*
 
 # Log File Configuration
 # For details, see: http://docs.python.org/2/library/logging.config.html
