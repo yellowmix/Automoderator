@@ -611,6 +611,7 @@ def process_messages():
     stop_time = int(cfg_file.get('reddit', 'last_message'))
     new_last_message = None
     changes_made = False
+    updated_subreddits = set()
 
     logging.debug('Checking messages')
 
@@ -647,12 +648,16 @@ def process_messages():
                 else:
                     sr_name = message.subject
 
+                if sr_name.lower() in updated_subreddits:
+                    continue
+
                 try:
                     subreddit = r.get_subreddit(sr_name)
                     if message.author in subreddit.get_moderators():
                         logging.info('Updating from wiki in /r/{0}'
                                      .format(sr_name))
                         update_from_wiki(subreddit, message.author)
+                        updated_subreddits.add(sr_name.lower())
                         changes_made = True
                     else:
                         send_error_message(message.author, sr_name,
