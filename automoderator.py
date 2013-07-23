@@ -795,6 +795,16 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
         conditions = [c for c in conditions
                           if c.type in ('comment', 'both')]
 
+    # get what's already been performed out of the log
+    performed_actions = set()
+    performed_yaml = set()
+    log_entries = (session.query(Log)
+                          .filter(Log.item_fullname == item.name)
+                          .all())
+    for entry in log_entries:
+        performed_actions.add(entry.action)
+        performed_yaml.add(entry.condition_yaml)
+
     # sort the conditions so the easiest ones are checked first
     conditions.sort(key=lambda c: c.requests_required)
 
@@ -812,24 +822,13 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
             continue
 
         # don't bother checking condition if this action has already been done
-        if condition.action:
-            try:
-                session.query(Log).filter(
-                    and_(Log.item_fullname == item.name,
-                         Log.action == condition.action)).one()
+        if condition.action in performed_actions:
                 continue
-            except NoResultFound:
-                pass
 
         # don't send repeat messages for the same item
-        if condition.comment or condition.modmail or condition.message:
-            try:
-                session.query(Log).filter(
-                    and_(Log.item_fullname == item.name,
-                         Log.condition_yaml == condition.yaml)).one()
+        if ((condition.comment or condition.modmail or condition.message) and
+            condition.yaml in performed_yaml):
                 continue
-            except NoResultFound:
-                pass
 
         # don't overwrite existing flair
         if ((condition.link_flair_text or condition.link_flair_class) and
@@ -843,6 +842,10 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
         try:
             start_time = time()
             match = condition.check_item(item)
+            if match:
+                performed_actions.add(condition.action)
+                performed_yaml.add(condition.yaml)
+
             logging.debug('{0}\n  Result {1} in {2}'
                           .format(condition.yaml,
                                   match,
