@@ -610,7 +610,6 @@ def process_messages():
     global r
     stop_time = int(cfg_file.get('reddit', 'last_message'))
     new_last_message = None
-    changes_made = False
     updated_subreddits = set()
 
     logging.debug('Checking messages')
@@ -658,7 +657,6 @@ def process_messages():
                                      .format(sr_name))
                         update_from_wiki(subreddit, message.author)
                         updated_subreddits.add(sr_name.lower())
-                        changes_made = True
                     else:
                         send_error_message(message.author, sr_name,
                             'You are not a moderator of that subreddit.')
@@ -677,7 +675,7 @@ def process_messages():
             cfg_file.set('reddit', 'last_message', str(new_last_message))
             cfg_file.write(open(path_to_cfg, 'w'))
 
-    return changes_made
+    return updated_subreddits
 
 
 def replace_placeholders(string, item, match):
@@ -997,6 +995,8 @@ def check_queues(queue_funcs, sr_dict, cond_dict):
     global r
 
     for queue in queue_funcs:
+        # refresh subreddit list due to being expired inside check_items
+        sr_dict = get_enabled_subreddits(reload_mod_subs=False)
         subreddits = [s for s in sr_dict if len(cond_dict[s][queue]) > 0]
         if len(subreddits) == 0:
             continue
@@ -1020,7 +1020,24 @@ def check_queues(queue_funcs, sr_dict, cond_dict):
                 check_items(queue, items, stop_time, sr_dict, cond_dict)
 
 
-def initialize(queues, reload_mod_subs=True):
+def update_conditions_for_sr(cond_dict, queues, subreddit):
+    cond_dict[subreddit.name] = {}
+    conditions = [Condition(d)
+                  for d in yaml.safe_load_all(subreddit.conditions_yaml)
+                  if isinstance(d, dict)]
+    for queue in queues:
+        cond_dict[subreddit.name][queue] = filter_conditions(conditions, queue)
+
+
+def load_all_conditions(sr_dict, queues):
+    cond_dict = {}
+    for sr in sr_dict.values():
+        update_conditions_for_sr(cond_dict, queues, sr)
+
+    return cond_dict
+
+
+def get_enabled_subreddits(reload_mod_subs=True):
     global r
 
     subreddits = (session.query(Subreddit)
@@ -1037,21 +1054,9 @@ def initialize(queues, reload_mod_subs=True):
         modded_subs = r.user._mod_subs.keys()
 
     # get rid of any subreddits the bot doesn't moderate
-    subreddits = [s for s in subreddits if s.name in modded_subs]
+    sr_dict = {sr.name: sr for sr in subreddits if sr.name in modded_subs}
 
-    sr_dict = {}
-    cond_dict = {}
-    for sr in subreddits:
-        sr_dict[sr.name] = sr
-        cond_dict[sr.name] = {}
-
-        conditions = [Condition(d)
-                      for d in yaml.safe_load_all(sr.conditions_yaml)
-                      if isinstance(d, dict)]
-        for queue in queues:
-            cond_dict[sr.name][queue] = filter_conditions(conditions, queue)
-
-    return (sr_dict, cond_dict)
+    return sr_dict
 
 
 def main():
@@ -1072,7 +1077,8 @@ def main():
                          .format(cfg_file.get('reddit', 'username')))
             r.login(cfg_file.get('reddit', 'username'),
                     cfg_file.get('reddit', 'password'))
-            sr_dict, cond_dict = initialize(queue_funcs.keys())
+            sr_dict = get_enabled_subreddits()
+            cond_dict = load_all_conditions(sr_dict, queue_funcs.keys())
             break
         except Exception as e:
             logging.error('ERROR: {0}'.format(e))
@@ -1087,9 +1093,16 @@ def main():
                 check_queues(queue_funcs, sr_dict, cond_dict)
 
                 Condition.clear_standard_cache()
-                if process_messages():
-                    sr_dict, cond_dict = initialize(queue_funcs.keys(),
-                                                    reload_mod_subs=False)
+
+                updated_srs = process_messages()
+
+                if updated_srs:
+                    sr_dict = get_enabled_subreddits(reload_mod_subs=False)
+                    for sr in updated_srs:
+                        update_conditions_for_sr(cond_dict,
+                                                 queue_funcs.keys(),
+                                                 sr_dict[sr])
+
                 logging.info('Sleeping ({0})'.format(datetime.now()))
                 sleep(5)
                 run_counter = 0
@@ -1098,15 +1111,20 @@ def main():
                               for q in queue_funcs
                               if q != 'report'},
                              sr_dict, cond_dict)
-                if process_messages():
-                    sr_dict, cond_dict = initialize(queue_funcs.keys(),
-                                                    reload_mod_subs=False)
+                updated_srs = process_messages()
+
+                if updated_srs:
+                    sr_dict = get_enabled_subreddits(reload_mod_subs=False)
+                    for sr in updated_srs:
+                        update_conditions_for_sr(cond_dict,
+                                                 queue_funcs.keys(),
+                                                 sr_dict[sr])
         except (praw.errors.ModeratorRequired,
                 praw.errors.ModeratorOrScopeRequired,
                 HTTPError) as e:
             if not isinstance(e, HTTPError) or e.response.status_code == 403:
                 logging.info('Re-initializing due to {0}'.format(e))
-                sr_dict, cond_dict = initialize(queue_funcs.keys())
+                sr_dict = get_enabled_subreddits()
         except KeyboardInterrupt:
             raise
         except Exception as e:
