@@ -668,6 +668,11 @@ def process_messages():
                             "The message's subject was not a valid subreddit")
                     else:
                         raise
+            elif (message.subject.strip().lower() == 'sleep' and
+                  message.author.name == owner_username):
+                logging.info('Sleeping for 10 seconds')
+                sleep(10)
+                logging.info('Sleep ended, resuming')
     except Exception as e:
         logging.error('ERROR: {0}'.format(e))
         raise
@@ -1090,7 +1095,6 @@ def main():
         run_counter += 1
         try:
             # only check reports every 10 runs
-            # sleep afterwards in case ^C is needed
             if run_counter % 10 == 0:
                 check_queues(queue_funcs, sr_dict, cond_dict)
 
@@ -1105,8 +1109,6 @@ def main():
                                                  queue_funcs.keys(),
                                                  sr_dict[sr])
 
-                logging.info('Sleeping ({0})'.format(datetime.now()))
-                sleep(5)
                 run_counter = 0
             else:
                 check_queues({q: queue_funcs[q]
