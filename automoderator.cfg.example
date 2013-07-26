@@ -29,6 +29,8 @@ log_retention_days = 7
 # last_message: UTC timestamp of the newest message seen by update_settings.py
 #               This value will be modified by update_settings.py
 # disclaimer: Will be appended to any comments/messages sent by the bot
+# owner_username: Your main account's username. This username gets some special
+#                 privileges for commands sent to the bot via PM
 [reddit]
 user_agent = reddit_username
 username = reddit_username
@@ -37,6 +39,7 @@ report_backlog_limit_hours = 48
 wiki_page_name = %(username)s
 last_message = 1356998400
 disclaimer = *[I am a bot](/r/AutoModerator/comments/q11pu/what_is_automoderator/), and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose?to=%%2Fr%%2F{{subreddit}}) if you have any questions or concerns.*
+owner_username = your_username
 
 # Log File Configuration
 # For details, see: http://docs.python.org/2/library/logging.config.html

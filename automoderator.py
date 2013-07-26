@@ -609,6 +609,7 @@ def process_messages():
     """Processes the bot's messages looking for invites/commands."""
     global r
     stop_time = int(cfg_file.get('reddit', 'last_message'))
+    owner_username = cfg_file.get('reddit', 'owner_username')
     new_last_message = None
     updated_subreddits = set()
 
@@ -652,7 +653,8 @@ def process_messages():
 
                 try:
                     subreddit = r.get_subreddit(sr_name)
-                    if message.author in subreddit.get_moderators():
+                    if (message.author.name == owner_username or
+                            message.author in subreddit.get_moderators()):
                         logging.info('Updating from wiki in /r/{0}'
                                      .format(sr_name))
                         update_from_wiki(subreddit, message.author)
