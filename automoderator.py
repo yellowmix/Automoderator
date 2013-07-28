@@ -39,7 +39,7 @@ class Condition(object):
     _match_modifiers = {'full-exact': u'^{0}$',
                         'full-text': ur'^\W*{0}\W*$',
                         'includes': u'{0}',
-                        'includes-word': ur'(?:\W|\b){0}(?:\W|\b)',
+                        'includes-word': ur'(?:^|\W|\b){0}(?:$|\W|\b)',
                         'starts-with': u'^{0}',
                         'ends-with': u'{0}$'}
     _modifier_defaults = {'link_id': 'full-exact',
