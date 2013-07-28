@@ -1002,8 +1002,6 @@ def check_queues(queue_funcs, sr_dict, cond_dict):
     global r
 
     for queue in queue_funcs:
-        # refresh subreddit list due to being expired inside check_items
-        sr_dict = get_enabled_subreddits(reload_mod_subs=False)
         subreddits = [s for s in sr_dict if len(cond_dict[s][queue]) > 0]
         if len(subreddits) == 0:
             continue

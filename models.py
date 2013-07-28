@@ -24,7 +24,7 @@ else:
         cfg_file.get('database', 'host')+'/'+\
         cfg_file.get('database', 'database'))
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
+Session = sessionmaker(bind=engine, expire_on_commit=False)
 session = Session()
 
 
