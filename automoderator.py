@@ -50,22 +50,22 @@ class Condition(object):
                           'author_flair_text': 'full-exact',
                           'author_flair_css_class': 'full-exact'}
 
+    _standard_cache = {}
+    _standard_rows = None
+
+    @classmethod
+    def update_standards(cls):
+        standards = session.query(StandardCondition).all()
+        if standards != cls._standard_rows:
+            cls._standard_cache = {cond.name.lower(): yaml.safe_load(cond.yaml)
+                                   for cond in standards}
+            cls._standard_rows = standards
+            return True
+        return False
+
     @classmethod
     def get_standard_condition(cls, name):
-        # if the cache is empty, fill it
-        if not cls._standard_cache:
-            cls._standard_cache = {}
-            standards = session.query(StandardCondition).all()
-            for cond in standards:
-                cond_name = cond.name.lower()
-                cls._standard_cache[cond_name] = yaml.safe_load(cond.yaml)
-
         return cls._standard_cache.get(name.lower(), dict())
-    _standard_cache = None
-
-    @classmethod
-    def clear_standard_cache(cls):
-        cls._standard_cache = None
 
     @property
     def requests_required(self):
@@ -1085,6 +1085,7 @@ def main():
             r.login(cfg_file.get('reddit', 'username'),
                     cfg_file.get('reddit', 'password'))
             sr_dict = get_enabled_subreddits()
+            Condition.update_standards()
             cond_dict = load_all_conditions(sr_dict, queue_funcs.keys())
             break
         except Exception as e:
@@ -1096,7 +1097,10 @@ def main():
 
     while True:
         try:
-            Condition.clear_standard_cache()
+            # if the standard conditions have changed, reinit all conditions
+            if Condition.update_standards():
+                logging.info('Updating standard conditions from database')
+                cond_dict = load_all_conditions(sr_dict, queue_funcs.keys())
 
             # check reports if past checking period
             if elapsed_since(last_reports_check) > reports_check_period:
