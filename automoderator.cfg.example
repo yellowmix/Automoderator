@@ -25,6 +25,8 @@ log_retention_days = 7
 # password: Reddit password to use
 # report_backlog_limit_hours: Number of hours to go back when retreiving mod
 #                             report queue
+# reports_check_period_mins: Number of minutes between checking the reports
+#                            page. Set to 0 to check every "pass"
 # wiki_page_name: Name of the wiki page to read a subreddit's rules from
 # last_message: UTC timestamp of the newest message seen by update_settings.py
 #               This value will be modified by update_settings.py
@@ -36,6 +38,7 @@ user_agent = reddit_username
 username = reddit_username
 password = reddit_password
 report_backlog_limit_hours = 48
+reports_check_period_mins = 10
 wiki_page_name = %(username)s
 last_message = 1356998400
 disclaimer = *[I am a bot](/r/AutoModerator/comments/q11pu/what_is_automoderator/), and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose?to=%%2Fr%%2F{{subreddit}}) if you have any questions or concerns.*

@@ -1090,39 +1090,32 @@ def main():
         except Exception as e:
             logging.error('ERROR: {0}'.format(e))
 
-    run_counter = 0
+    reports_mins = int(cfg_file.get('reddit', 'reports_check_period_mins'))
+    reports_check_period = timedelta(minutes=reports_mins)
+    last_reports_check = time()
+
     while True:
-        run_counter += 1
         try:
-            # only check reports every 10 runs
-            if run_counter % 10 == 0:
-                check_queues(queue_funcs, sr_dict, cond_dict)
+            Condition.clear_standard_cache()
 
-                Condition.clear_standard_cache()
-
-                updated_srs = process_messages()
-
-                if updated_srs:
-                    sr_dict = get_enabled_subreddits(reload_mod_subs=False)
-                    for sr in updated_srs:
-                        update_conditions_for_sr(cond_dict,
-                                                 queue_funcs.keys(),
-                                                 sr_dict[sr])
-
-                run_counter = 0
-            else:
-                check_queues({q: queue_funcs[q]
-                              for q in queue_funcs
-                              if q != 'report'},
+            # check reports if past checking period
+            if elapsed_since(last_reports_check) > reports_check_period:
+                last_reports_check = time()
+                check_queues({'report': queue_funcs['report']},
                              sr_dict, cond_dict)
-                updated_srs = process_messages()
+                             
+            check_queues({q: queue_funcs[q]
+                          for q in queue_funcs
+                          if q != 'report'},
+                         sr_dict, cond_dict)
 
-                if updated_srs:
-                    sr_dict = get_enabled_subreddits(reload_mod_subs=False)
-                    for sr in updated_srs:
-                        update_conditions_for_sr(cond_dict,
-                                                 queue_funcs.keys(),
-                                                 sr_dict[sr])
+            updated_srs = process_messages()
+            if updated_srs:
+                sr_dict = get_enabled_subreddits(reload_mod_subs=False)
+                for sr in updated_srs:
+                    update_conditions_for_sr(cond_dict,
+                                             queue_funcs.keys(),
+                                             sr_dict[sr])
         except (praw.errors.ModeratorRequired,
                 praw.errors.ModeratorOrScopeRequired,
                 HTTPError) as e:
