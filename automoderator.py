@@ -394,7 +394,7 @@ def update_from_wiki(subreddit, requester):
             .format(subreddit.display_name,
                     cfg_file.get('reddit', 'wiki_page_name'),
                     username))
-        return
+        return False
 
     html_parser = HTMLParser.HTMLParser()
     page_content = html_parser.unescape(page.content_md)
@@ -413,7 +413,7 @@ def update_from_wiki(subreddit, requester):
             'Error when reading conditions from wiki - '
             'Syntax invalid in section #{0}:\n\n{1}'
             .format(condition_num, indented))
-        return
+        return False
 
     # reload and actually process the conditions
     condition_defs = yaml.safe_load_all(page_content)
@@ -433,7 +433,7 @@ def update_from_wiki(subreddit, requester):
             send_error_message(requester, subreddit.display_name,
                 'Invalid condition in section #{0} - {1}'
                 .format(condition_num, e))
-            return
+            return False
 
         # create a condition for final checks
         condition = Condition(cond_def)
@@ -446,7 +446,7 @@ def update_from_wiki(subreddit, requester):
                 send_error_message(requester, subreddit.display_name,
                     'Generated an invalid regex from section #{0} - {1}'
                     .format(condition_num, e))
-                return
+                return False
 
         condition_num += 1
         kept_sections.append(cond_def)
@@ -471,6 +471,7 @@ def update_from_wiki(subreddit, requester):
                    '{0} conditions updated'.format(username),
                    "{0}'s conditions were successfully updated for /r/{1}"
                    .format(username, subreddit.display_name))
+    return True
 
 
 def check_condition_valid(cond):
@@ -657,8 +658,8 @@ def process_messages():
                             message.author in subreddit.get_moderators()):
                         logging.info('Updating from wiki in /r/{0}'
                                      .format(sr_name))
-                        update_from_wiki(subreddit, message.author)
-                        updated_subreddits.add(sr_name.lower())
+                        if update_from_wiki(subreddit, message.author):
+                            updated_subreddits.add(sr_name.lower())
                     else:
                         send_error_message(message.author, sr_name,
                             'You are not a moderator of that subreddit.')
