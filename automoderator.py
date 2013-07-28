@@ -1050,8 +1050,6 @@ def get_enabled_subreddits(reload_mod_subs=True):
     subreddits = (session.query(Subreddit)
                          .filter(Subreddit.enabled == True)
                          .all())
-    for sr in subreddits:
-        sr.name = sr.name.lower()
 
     if reload_mod_subs:
         r.user._mod_subs = None
@@ -1061,7 +1059,9 @@ def get_enabled_subreddits(reload_mod_subs=True):
         modded_subs = r.user._mod_subs.keys()
 
     # get rid of any subreddits the bot doesn't moderate
-    sr_dict = {sr.name: sr for sr in subreddits if sr.name in modded_subs}
+    sr_dict = {sr.name.lower(): sr
+               for sr in subreddits
+               if sr.name.lower() in modded_subs}
 
     return sr_dict
 
