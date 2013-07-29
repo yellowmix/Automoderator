@@ -499,6 +499,8 @@ def check_condition_valid(cond):
     validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
 
+    validate_modifiers(cond)
+
     # validate user conditions
     if 'user_conditions' in cond:
         user_conds = cond['user_conditions']
@@ -563,6 +565,35 @@ def validate_keys(check):
                                  'Check for typos and ensure all modifiers '
                                  'correspond to a defined match subject.'
                                  .format(key))
+
+
+def validate_modifiers(check):
+    """Checks that all modifier definitions in the condition are valid."""
+    if 'modifiers' not in check:
+        return
+
+    match_types = Condition._match_modifiers.keys()
+    valid_modifiers = set(match_types + ['inverse', 'regex'])
+
+    if isinstance(check['modifiers'], dict):
+        to_validate = check['modifiers'].values()
+    else:
+        to_validate = list((check['modifiers'],))
+
+    for mod_list in to_validate:
+        # convert to a list if it's a string
+        if not isinstance(mod_list, list):
+            mod_list = mod_list.split(' ')
+
+        # make sure all modifiers are valid choices
+        for mod in mod_list:
+            if mod not in valid_modifiers:
+                raise ValueError('Invalid modifier: `{0}`'.format(mod))
+
+        # check that they specified no more than one match type modifier
+        if sum([1 for mod in mod_list if mod in match_types]) > 1:
+            raise ValueError('More than one match type modifier (`{0}`) '
+                             'specified.'.format(', '.join(match_types)))
 
 
 def validate_value_in(check, key, valid_vals):
