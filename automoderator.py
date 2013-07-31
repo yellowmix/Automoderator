@@ -1018,7 +1018,7 @@ def build_multireddit_groups(subreddits):
     current_multi = []
     current_len = 0
     for sub in subreddits:
-        if current_len > 3000:
+        if current_len > 4700:
             multireddits.append(current_multi)
             current_multi = []
             current_len = 0
