@@ -1145,7 +1145,10 @@ def main():
 
             updated_srs = process_messages()
             if updated_srs:
-                sr_dict = get_enabled_subreddits(reload_mod_subs=False)
+                if any([sr not in sr_dict for sr in updated_srs]):
+                    sr_dict = get_enabled_subreddits(reload_mod_subs=True)
+                else:
+                    sr_dict = get_enabled_subreddits(reload_mod_subs=False)
                 for sr in updated_srs:
                     update_conditions_for_sr(cond_dict,
                                              queue_funcs.keys(),
