@@ -634,7 +634,13 @@ def send_error_message(user, sr_name, error):
     global r
     r.send_message(user,
                    'Error updating from wiki in /r/{0}'.format(sr_name),
-                   'Encountered the following error:\n\n{0}'.format(error))
+                   '### Error updating from [wiki configuration in /r/{0}]'
+                   '(http://www.reddit.com/r/{0}/wiki/{1}):\n\n---\n\n'
+                   '{2}\n\n---\n\n[View configuration documentation](https://'
+                   'github.com/Deimos/AutoModerator/wiki/Wiki-Configuration)'
+                   .format(sr_name,
+                           cfg_file.get('reddit', 'wiki_page_name'),
+                           error))
 
 
 def process_messages():
