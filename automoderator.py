@@ -649,7 +649,9 @@ def process_messages():
     stop_time = int(cfg_file.get('reddit', 'last_message'))
     owner_username = cfg_file.get('reddit', 'owner_username')
     new_last_message = None
-    updated_subreddits = set()
+    update_srs = set()
+    invite_srs = set()
+    sleep_after = False
 
     logging.debug('Checking messages')
 
@@ -667,18 +669,7 @@ def process_messages():
             # if it's a subreddit invite
             if (not message.author and
                     message.subject.startswith('invitation to moderate /r/')):
-                try:
-                    subreddit = message.subreddit
-
-                    # workaround for praw clearing mod sub list on accept
-                    mod_subs = r.user._mod_subs
-                    r.accept_moderator_invite(subreddit)
-                    r.user._mod_subs = mod_subs
-                    r.user._mod_subs[subreddit.display_name.lower()] = subreddit
-                    logging.info('Accepted mod invite in /r/{0}'
-                                 .format(message.subreddit.display_name))
-                except praw.errors.InvalidInvite:
-                    pass
+                invite_srs.add(message.subreddit.display_name.lower())
             elif message.body.strip().lower() == 'update':
                 # handle if they put in something like '/r/' in the subject
                 if '/' in message.subject:
@@ -686,31 +677,53 @@ def process_messages():
                 else:
                     sr_name = message.subject
 
-                if sr_name.lower() in updated_subreddits:
+                if (sr_name.lower(), message.author.name) in update_srs:
                     continue
 
                 try:
                     subreddit = r.get_subreddit(sr_name)
                     if (message.author.name == owner_username or
                             message.author in subreddit.get_moderators()):
-                        logging.info('Updating from wiki in /r/{0}'
-                                     .format(sr_name))
-                        if update_from_wiki(subreddit, message.author):
-                            updated_subreddits.add(sr_name.lower())
+                        update_srs.add((sr_name.lower(), message.author.name))
                     else:
                         send_error_message(message.author, sr_name,
-                            'You are not a moderator of that subreddit.')
+                            'You do not moderate /r/{0}'.format(sr_name))
                 except HTTPError as e:
-                    if e.response.status_code == 404:
-                        send_error_message(message.author, sr_name,
-                            "The message's subject was not a valid subreddit")
-                    else:
-                        raise
+                    send_error_message(message.author, sr_name,
+                        'Unable to access /r/{0}'.format(sr_name))
             elif (message.subject.strip().lower() == 'sleep' and
                   message.author.name == owner_username):
-                logging.info('Sleeping for 10 seconds')
-                sleep(10)
-                logging.info('Sleep ended, resuming')
+                sleep_after = True
+
+        # accept subreddit invites
+        for subreddit in invite_srs:
+            try:
+                # workaround for praw clearing mod sub list on accept
+                mod_subs = r.user._mod_subs
+                r.accept_moderator_invite(subreddit)
+                r.user._mod_subs = mod_subs
+                r.user._mod_subs[subreddit] = r.get_subreddit(subreddit)
+                logging.info('Accepted mod invite in /r/{0}'
+                             .format(subreddit))
+            except praw.errors.InvalidInvite:
+                pass
+
+        # do requested updates from wiki pages
+        updated_srs = []
+        for subreddit, sender in update_srs:
+            if update_from_wiki(r.get_subreddit(subreddit),
+                                r.get_redditor(sender)):
+                updated_srs.append(subreddit)
+                logging.info('Updated from wiki in /r/{0}'.format(subreddit))
+            else:
+                logging.info('Error updating from wiki in /r/{0}'
+                             .format(subreddit))
+
+        if sleep_after:
+            logging.info('Sleeping for 10 seconds')
+            sleep(10)
+            logging.info('Sleep ended, resuming')
+
     except Exception as e:
         logging.error('ERROR: {0}'.format(e))
         raise
@@ -720,7 +733,7 @@ def process_messages():
             cfg_file.set('reddit', 'last_message', str(new_last_message))
             cfg_file.write(open(path_to_cfg, 'w'))
 
-    return updated_subreddits
+    return updated_srs
 
 
 def replace_placeholders(string, item, match):
