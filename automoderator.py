@@ -740,8 +740,10 @@ def replace_placeholders(string, item, match):
     """Replaces placeholders in the string."""
     if isinstance(item, praw.objects.Comment):
         string = string.replace('{{body}}', item.body)
+        string = string.replace('{{kind}}', 'comment')
     else:
         string = string.replace('{{body}}', item.selftext)
+        string = string.replace('{{kind}}', 'submission')
     string = string.replace('{{domain}}', getattr(item, 'domain', ''))
     string = string.replace('{{permalink}}', get_permalink(item))
     string = string.replace('{{subreddit}}', item.subreddit.display_name)
