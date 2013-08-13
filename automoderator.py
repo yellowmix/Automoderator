@@ -70,12 +70,12 @@ class Condition(object):
     @property
     def requests_required(self):
         # all things that will require an additional request
-        reqs = sum([1 for i in
+        reqs = sum(1 for i in
                     (self.action, self.user_conditions, self.comment,
                      self.modmail, self.message,
                      (self.user_flair_text or self.user_flair_class),
                      (self.link_flair_text or self.link_flair_class))
-                    if i])
+                    if i)
         # one extra request for distinguishing a comment
         if self.comment:
             reqs += 1
@@ -121,9 +121,9 @@ class Condition(object):
         # if type wasn't defined, set based on fields being matched against
         if not getattr(self, 'type', None):
             if (len(match_fields) > 0 and 
-                all([f in ('title', 'domain', 'url',
+                all(f in ('title', 'domain', 'url',
                            'media_user', 'media_title', 'media_description')
-                     for f in match_fields])):
+                     for f in match_fields)):
                 self.type = 'submission'
             else:
                 self.type = 'both'
@@ -208,9 +208,9 @@ class Condition(object):
 
                 # remove blockquotes if ignore_blockquotes is enabled
                 if source == 'body' and self.ignore_blockquotes:
-                    string = '\n'.join([line for line in string.splitlines()
+                    string = '\n'.join(line for line in string.splitlines()
                                         if not line.startswith('> ') and
-                                           len(line) > 0])
+                                           len(line) > 0)
 
                 match = re.search(self.match_patterns[subject],
                                   string,
@@ -541,8 +541,8 @@ def validate_keys(check):
 
         # multiple subjects
         if ('+' in key and
-                all([t in Condition._match_targets
-                     for t in key.split('+')])):
+                all(t in Condition._match_targets
+                     for t in key.split('+'))):
             continue
 
         raise ValueError('Invalid variable: `{0}`'.format(key))
@@ -591,7 +591,7 @@ def validate_modifiers(check):
                 raise ValueError('Invalid modifier: `{0}`'.format(mod))
 
         # check that they specified no more than one match type modifier
-        if sum([1 for mod in mod_list if mod in match_types]) > 1:
+        if sum(1 for mod in mod_list if mod in match_types) > 1:
             raise ValueError('More than one match type modifier (`{0}`) '
                              'specified.'.format(', '.join(match_types)))
 
@@ -1065,9 +1065,9 @@ def check_queues(queue_funcs, sr_dict, cond_dict):
                 limit = cfg_file.get('reddit', 'report_backlog_limit_hours')
                 stop_time = datetime.utcnow() - timedelta(hours=int(limit))
             else:
-                stop_time = max([getattr(sr, 'last_'+queue)
+                stop_time = max(getattr(sr, 'last_'+queue)
                                  for sr in sr_dict.values()
-                                 if sr.name in multi])
+                                 if sr.name in multi)
 
             queue_subreddit = r.get_subreddit('+'.join(multi))
             if queue_subreddit:
@@ -1164,7 +1164,7 @@ def main():
 
             updated_srs = process_messages()
             if updated_srs:
-                if any([sr not in sr_dict for sr in updated_srs]):
+                if any(sr not in sr_dict for sr in updated_srs):
                     sr_dict = get_enabled_subreddits(reload_mod_subs=True)
                 else:
                     sr_dict = get_enabled_subreddits(reload_mod_subs=False)
