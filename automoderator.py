@@ -844,6 +844,8 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
 
     Returns True if any conditions matched, False otherwise.
     """
+    bot_username = cfg_file.get('reddit', 'username')
+
     if isinstance(item, praw.objects.Submission):
         conditions = [c for c in conditions
                           if c.type in ('submission', 'both')]
@@ -866,8 +868,10 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
 
     any_matched = False
     for condition in conditions:
-        # never remove anything if it's been approved by a mod
-        if condition.action in ('remove', 'spam') and item.approved_by:
+        # never remove anything if it's been approved by another mod
+        if (condition.action in ('remove', 'spam') and
+                item.approved_by and
+                item.approved_by.name.lower() != bot_username.lower()):
             continue
 
         # don't approve shadowbanned users' posts unless specifically defined
