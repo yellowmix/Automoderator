@@ -180,11 +180,15 @@ class Condition(object):
 
         html_parser = HTMLParser.HTMLParser()
         match = None
+        approve_shadowbanned = False
         for subject in self.match_patterns:
             sources = set(subject.split('+'))
             for source in sources:
+                approve_shadowbanned = False
                 if source == 'user' and item.author:
                     string = item.author.name
+                    # allow approving shadowbanned if it's a username match
+                    approve_shadowbanned = True
                 elif source == 'link_id':
                     # trim off the 't3_'
                     string = getattr(item, 'link_id', '')[3:]
@@ -235,7 +239,12 @@ class Condition(object):
             return False
 
         # matched, perform any actions
-        self.execute_actions(item, match)
+        # don't approve shadowbanned users' posts except in special cases
+        if (self.action != 'approve' or
+                not self.check_shadowbanned or
+                not user_is_shadowbanned(item.author) or
+                approve_shadowbanned):
+            self.execute_actions(item, match)
 
         return True
 
@@ -276,11 +285,6 @@ class Condition(object):
                     value = (datetime.utcnow() - user_date).days
                 elif attr == 'combined_karma':
                     value = user.link_karma + user.comment_karma
-                elif attr == 'is_shadowbanned':
-                    if not self.check_shadowbanned:
-                        value = False
-                    else:
-                        value = user_is_shadowbanned(user)
                 else:
                     value = getattr(user, attr, 0)
             else:
@@ -520,7 +524,6 @@ def check_condition_valid(cond):
         validate_regex(user_conds, 'comment_karma', operator_int_regex)
         validate_regex(user_conds, 'link_karma', operator_int_regex)
         validate_regex(user_conds, 'combined_karma', operator_int_regex)
-        validate_type(user_conds, 'is_shadowbanned', bool)
         validate_type(user_conds, 'is_gold', bool)
         validate_regex(user_conds, 'rank', operator_rank_regex)
 
@@ -558,8 +561,7 @@ def validate_keys(check):
     # check user_conditions keys
     if 'user_conditions' in check:
         valid_keys = set(['account_age', 'combined_karma', 'comment_karma',
-                          'is_gold', 'is_shadowbanned', 'link_karma',
-                          'must_satisfy', 'rank'])
+                          'is_gold', 'link_karma', 'must_satisfy', 'rank'])
         for key in check['user_conditions']:
             if key not in valid_keys:
                 raise ValueError('Invalid user_conditions variable: `{0}`'
@@ -884,13 +886,6 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
                 item.approved_by.name.lower() != bot_username.lower()):
             continue
 
-        # don't approve shadowbanned users' posts unless specifically defined
-        if (condition.action == 'approve' and
-                condition.check_shadowbanned and
-                not condition.user_conditions.get('is_shadowbanned') and
-                user_is_shadowbanned(item.author)):
-            continue
-
         # don't bother checking condition if this action has already been done
         if condition.action in performed_actions:
                 continue
@@ -944,20 +939,17 @@ def filter_conditions(conditions, queue):
     elif queue == 'report':
         return [c for c in conditions
                 if c.action != 'report' and
-                   (c.action != 'approve' or c.reports > 0) and
-                   (not c.user_conditions.get('is_shadowbanned', None))]
+                   (c.action != 'approve' or c.reports > 0)]
     elif queue == 'submission':
         return [c for c in conditions
                 if c.type in ('both', 'submission') and
                    c.reports < 1 and
-                   c.action != 'approve' and
-                   (not c.user_conditions.get('is_shadowbanned', None))]
+                   c.action != 'approve']
     elif queue == 'comment':
         return [c for c in conditions
                 if c.type in ('both', 'comment') and
                    c.reports < 1 and
-                   c.action != 'approve' and
-                   (not c.user_conditions.get('is_shadowbanned', None))]
+                   c.action != 'approve']
 
 
 def get_user_rank(user, subreddit):
