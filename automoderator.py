@@ -771,6 +771,18 @@ def replace_placeholders(string, item, match):
     else:
         string = string.replace('{{user}}', '[deleted]')
 
+    if getattr(item, 'media', None):
+        oembed_mapping = {'{{media_user}}': 'author_name',
+                          '{{media_title}}': 'title',
+                          '{{media_description}}': 'description'}
+        for placeholder, source in oembed_mapping.iteritems():
+            if placeholder in string:
+                try:
+                    string = string.replace(placeholder,
+                                            item.media['oembed'][source])
+                except KeyError:
+                    pass
+
     # replace any {{match_##}} with the corresponding match groups
     string = re.sub(r'\{\{match-(\d+)\}\}', r'\\\1', string)
     if match:
