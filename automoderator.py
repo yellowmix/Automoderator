@@ -103,6 +103,7 @@ class Condition(object):
         # set match target/pattern definitions
         self.match_patterns = {}
         self.match_success = {}
+        self.match_flags = {}
         match_fields = set()
         for key in [k for k in init
                     if k in self._match_targets or '+' in k]:
@@ -111,10 +112,17 @@ class Condition(object):
             else:
                 modifiers = self.modifiers
             self.match_patterns[key] = self.get_pattern(key, modifiers)
+
             if 'inverse' in modifiers:
                 self.match_success[key] = False
             else:
                 self.match_success[key] = True
+
+            # default match flags
+            self.match_flags[key] = re.DOTALL|re.UNICODE
+            if 'case-sensitive' not in modifiers:
+                self.match_flags[key] |= re.IGNORECASE
+
             for field in key.split('+'):
                 match_fields.add(field)
         
@@ -214,7 +222,7 @@ class Condition(object):
 
                 match = re.search(self.match_patterns[subject],
                                   string,
-                                  re.DOTALL|re.UNICODE|re.IGNORECASE)
+                                  self.match_flags[subject])
 
                 if match:
                     break
@@ -573,7 +581,7 @@ def validate_modifiers(check):
         return
 
     match_types = Condition._match_modifiers.keys()
-    valid_modifiers = set(match_types + ['inverse', 'regex'])
+    valid_modifiers = set(match_types + ['case-sensitive', 'inverse', 'regex'])
 
     if isinstance(check['modifiers'], dict):
         to_validate = check['modifiers'].values()
