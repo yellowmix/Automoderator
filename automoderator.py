@@ -20,6 +20,7 @@ class Condition(object):
     _defaults = {'reports': None,
                  'is_reply': None,
                  'ignore_blockquotes': False,
+                 'priority': 0,
                  'action': None,
                  'comment': None,
                  'modmail': None,
@@ -506,6 +507,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'is_reply', bool)
     validate_type(cond, 'ignore_blockquotes', bool)
     validate_type(cond, 'reports', int)
+    validate_type(cond, 'priority', int)
     validate_type(cond, 'comment', basestring)
     validate_type(cond, 'modmail', basestring)
     validate_type(cond, 'modmail_subject', basestring)
@@ -891,8 +893,9 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
         performed_actions.add(entry.action)
         performed_yaml.add(entry.condition_yaml)
 
-    # sort the conditions so the easiest ones are checked first
+    # sort the conditions by desc priority, and then by required requests
     conditions.sort(key=lambda c: c.requests_required)
+    conditions.sort(key=lambda c: c.priority, reverse=True)
 
     any_matched = False
     for condition in conditions:
