@@ -333,11 +333,15 @@ class Condition(object):
             text = replace_placeholders(self.link_flair_text, item, match)
             css_class = replace_placeholders(self.link_flair_class, item, match)
             item.set_flair(text, css_class.lower())
+            item.link_flair_text = text
+            item.link_flair_css_class = css_class.lower()
             log_actions.append('link_flair')
         if (self.user_flair_text or self.user_flair_class):
             text = replace_placeholders(self.user_flair_text, item, match)
             css_class = replace_placeholders(self.user_flair_class, item, match)
             item.subreddit.set_flair(item.author, text, css_class.lower())
+            item.author_flair_text = text
+            item.author_flair_css_class = css_class.lower()
             log_actions.append('user_flair')
 
         if self.comment:
