@@ -223,7 +223,7 @@ class Condition(object):
                 # remove blockquotes if ignore_blockquotes is enabled
                 if source == 'body' and self.ignore_blockquotes:
                     string = '\n'.join(line for line in string.splitlines()
-                                        if not line.startswith('> ') and
+                                        if not line.startswith('>') and
                                            len(line) > 0)
 
                 match = re.search(self.match_patterns[subject],
