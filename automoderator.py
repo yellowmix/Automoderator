@@ -524,15 +524,15 @@ def check_condition_valid(cond):
     if 'user_conditions' in cond:
         user_conds = cond['user_conditions']
         operator_regex = '((==?|<|>) )?'
-        operator_int_regex = operator_regex+'-?\d+'
-        operator_rank_regex = operator_regex+'(user|contributor|moderator)'
+        oper_int_regex = '^'+operator_regex+'-?\d+$'
+        oper_rank_regex = '^'+operator_regex+'(user|contributor|moderator)$'
 
-        validate_regex(user_conds, 'account_age', operator_int_regex)
-        validate_regex(user_conds, 'comment_karma', operator_int_regex)
-        validate_regex(user_conds, 'link_karma', operator_int_regex)
-        validate_regex(user_conds, 'combined_karma', operator_int_regex)
+        validate_regex(user_conds, 'account_age', oper_int_regex)
+        validate_regex(user_conds, 'comment_karma', oper_int_regex)
+        validate_regex(user_conds, 'link_karma', oper_int_regex)
+        validate_regex(user_conds, 'combined_karma', oper_int_regex)
         validate_type(user_conds, 'is_gold', bool)
-        validate_regex(user_conds, 'rank', operator_rank_regex)
+        validate_regex(user_conds, 'rank', oper_rank_regex)
 
         validate_value_in(user_conds, 'must_satisfy', ('any', 'all'))
 
