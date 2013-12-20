@@ -85,8 +85,7 @@ class Condition(object):
         return reqs
 
     def __init__(self, values):
-        # lowercase all keys
-        values = {k.lower(): v for k, v in values.iteritems()}
+        values = lowercase_keys_recursively(values)
 
         self.yaml = yaml.dump(values)
 
@@ -442,8 +441,7 @@ def update_from_wiki(subreddit, requester):
         if not isinstance(cond_def, dict):
             continue
 
-        # lowercase all keys
-        cond_def = {k.lower(): v for k, v in cond_def.iteritems()}
+        cond_def = lowercase_keys_recursively(cond_def)
 
         try:
             check_condition_valid(cond_def)
@@ -490,6 +488,17 @@ def update_from_wiki(subreddit, requester):
                    "{0}'s conditions were successfully updated for /r/{1}"
                    .format(username, subreddit.display_name))
     return True
+
+
+def lowercase_keys_recursively(subject):
+    """Recursively lowercases all keys in a dict."""
+    lowercased = dict()
+    for key, val in subject.iteritems():
+        if isinstance(val, dict):
+            val = lowercase_keys_recursively(val)
+        lowercased[key.lower()] = val
+
+    return lowercased
 
 
 def check_condition_valid(cond):
