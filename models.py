@@ -78,6 +78,7 @@ class Log(Base):
     item_fullname = Column(String(255), nullable=False)
     action = Column(Enum('approve',
                          'remove',
+                         'spam',
                          'report',
                          'link_flair',
                          'user_flair',
