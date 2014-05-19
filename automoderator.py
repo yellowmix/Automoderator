@@ -37,7 +37,7 @@ class Condition(object):
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
                       'media_user', 'media_title', 'media_description',
                       'author_flair_text', 'author_flair_css_class',
-                      'link_title']
+                      'link_title', 'link_url']
     _match_modifiers = {'full-exact': u'^{0}$',
                         'full-text': ur'^\W*{0}\W*$',
                         'includes': u'{0}',
@@ -50,7 +50,8 @@ class Condition(object):
                           'url': 'includes',
                           'media_user': 'full-exact',
                           'author_flair_text': 'full-exact',
-                          'author_flair_css_class': 'full-exact'}
+                          'author_flair_css_class': 'full-exact',
+                          'link_url': 'includes'}
 
     _standard_cache = {}
     _standard_rows = None
