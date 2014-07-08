@@ -818,8 +818,10 @@ def check_items(queue, items, stop_time, sr_dict, cond_dict):
         if queue == 'spam' and not item.banned_by:
             continue
 
-        # never check the bot's own posts
-        if item.author and item.author.name.lower() == bot_username.lower():
+        # never check the bot's own comments
+        if (item.author and
+                item.author.name.lower() == bot_username.lower() and
+                isinstance(item, praw.objects.Comment)):
             continue
 
         item_time = datetime.utcfromtimestamp(item.created_utc)
