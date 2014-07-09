@@ -33,6 +33,7 @@ class Condition(object):
                  'user_flair_text': '',
                  'user_flair_class': '',
                  'user_conditions': {},
+                 'set_options': [],
                  'modifiers': []}
 
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
@@ -83,6 +84,9 @@ class Condition(object):
         # one extra request for distinguishing a comment
         if self.comment:
             reqs += 1
+
+        if self.set_options:
+            reqs += len(set(self.set_options))
 
         return reqs
 
@@ -138,6 +142,9 @@ class Condition(object):
                 self.type = 'submission'
             else:
                 self.type = 'both'
+
+        if self.set_options and not isinstance(self.set_options, list):
+            self.set_options = self.set_options.split()
 
 
     def get_pattern(self, subject, modifiers):
@@ -339,6 +346,15 @@ class Condition(object):
         elif self.action == 'report':
             item.report()
 
+        # set thread options
+        if self.set_options and isinstance(item, praw.objects.Submission):
+            if 'nsfw' in self.set_options:
+                item.mark_as_nsfw()
+            if 'contest' in self.set_options:
+                item.set_contest_mode(True)
+            if 'sticky' in self.set_options:
+                item.sticky()
+
         # set flairs
         if (isinstance(item, praw.objects.Submission) and 
                 (self.link_flair_text or self.link_flair_class)):
@@ -535,11 +551,21 @@ def check_condition_valid(cond):
     validate_type(cond, 'modmail_subject', basestring)
     validate_type(cond, 'message', basestring)
     validate_type(cond, 'message_subject', basestring)
+    validate_type(cond, 'set_options', (basestring, list))
 
     validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
 
     validate_modifiers(cond)
+
+    # validate set_options
+    if 'set_options' in cond:
+        set_options = cond['set_options']
+        if not isinstance(set_options, list):
+            set_options = set_options.split()
+        for option in set_options:
+            if option not in ('nsfw', 'contest', 'sticky'):
+                raise ValueError('Invalid set_options value: `{0}`'.format(option))
 
     # validate user conditions
     if 'user_conditions' in cond:
