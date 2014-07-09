@@ -1141,7 +1141,12 @@ def get_enabled_subreddits(reload_mod_subs=True):
     if reload_mod_subs:
         r.user._mod_subs = None
         logging.info('Getting list of moderated subreddits')
-        modded_subs = r.user.get_cached_moderated_reddits().keys()
+        modded_subs = None
+        while not modded_subs:
+            try:
+                modded_subs = r.user.get_cached_moderated_reddits().keys()
+            except:
+                modded_subs = None
     else:
         modded_subs = r.user._mod_subs.keys()
 
