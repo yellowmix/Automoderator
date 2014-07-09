@@ -18,6 +18,7 @@ r = None
 
 class Condition(object):
     _defaults = {'reports': None,
+                 'author_is_submitter': None,
                  'is_reply': None,
                  'ignore_blockquotes': False,
                  'priority': 0,
@@ -179,6 +180,15 @@ class Condition(object):
         # check whether it's a reply or top-level comment if necessary
         if self.is_reply is not None and self.is_reply != is_reply(item):
             return False
+
+        # check whether the author is the submitter if necessary
+        if (self.author_is_submitter is not None and
+                isinstance(item, praw.objects.Comment)):
+            author_is_submitter = (item.author and
+                                   item.link_author != "[deleted]" and
+                                   item.author.name == item.link_author)
+            if self.author_is_submitter != author_is_submitter:
+                return False
 
         html_parser = HTMLParser.HTMLParser()
         match = None
@@ -515,6 +525,7 @@ def check_condition_valid(cond):
 
     validate_type(cond, 'user_conditions', dict)
     validate_keys(cond)
+    validate_type(cond, 'author_is_submitter', bool)
     validate_type(cond, 'is_reply', bool)
     validate_type(cond, 'ignore_blockquotes', bool)
     validate_type(cond, 'reports', int)
