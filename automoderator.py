@@ -21,6 +21,8 @@ class Condition(object):
                  'author_is_submitter': None,
                  'is_reply': None,
                  'ignore_blockquotes': False,
+                 'body_min_length': None,
+                 'body_max_length': None,
                  'priority': 0,
                  'action': None,
                  'comment': None,
@@ -197,6 +199,29 @@ class Condition(object):
             if self.author_is_submitter != author_is_submitter:
                 return False
 
+        # pull out the item's body and remove blockquotes if necessary
+        if isinstance(item, praw.objects.Submission):
+            body_string = item.selftext
+        else:
+            body_string = item.body
+        if self.ignore_blockquotes:
+            body_string = '\n'.join(line for line in body_string.splitlines()
+                                    if not line.startswith('>') and
+                                    len(line) > 0)
+
+        # check body length restrictions if necessary
+        if self.body_min_length or self.body_max_length:
+            # remove non-word chars on either end of the string
+            pattern = re.compile(r'^\W+', re.UNICODE)
+            body_text = pattern.sub('', body_string)
+            pattern = re.compile(r'\W+$', re.UNICODE)
+            body_text = pattern.sub('', body_text)
+
+            if self.body_min_length and len(body_text) < self.body_min_length:
+                return False
+            if self.body_max_length and len(body_text) > self.body_max_length:
+                return False
+
         html_parser = HTMLParser.HTMLParser()
         match = None
         approve_shadowbanned = False
@@ -211,9 +236,8 @@ class Condition(object):
                 elif source == 'link_id':
                     # trim off the 't3_'
                     string = getattr(item, 'link_id', '')[3:]
-                elif (source == 'body' and
-                        isinstance(item, praw.objects.Submission)):
-                    string = item.selftext
+                elif source == 'body':
+                    string = body_string
                 elif (source == 'url' and
                         getattr(item, 'is_self', False)):
                     # get rid of the url value for self-posts
@@ -236,12 +260,6 @@ class Condition(object):
                     string = ''
 
                 string = html_parser.unescape(string)
-
-                # remove blockquotes if ignore_blockquotes is enabled
-                if source == 'body' and self.ignore_blockquotes:
-                    string = '\n'.join(line for line in string.splitlines()
-                                        if not line.startswith('>') and
-                                           len(line) > 0)
 
                 match = re.search(self.match_patterns[subject],
                                   string,
@@ -546,6 +564,8 @@ def check_condition_valid(cond):
     validate_type(cond, 'ignore_blockquotes', bool)
     validate_type(cond, 'reports', int)
     validate_type(cond, 'priority', int)
+    validate_type(cond, 'body_min_length', int)
+    validate_type(cond, 'body_max_length', int)
     validate_type(cond, 'comment', basestring)
     validate_type(cond, 'modmail', basestring)
     validate_type(cond, 'modmail_subject', basestring)
