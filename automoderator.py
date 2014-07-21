@@ -1226,6 +1226,8 @@ def main():
 
     while True:
         try:
+            sr_dict = get_enabled_subreddits(reload_mod_subs=False)
+
             # if the standard conditions have changed, reinit all conditions
             if Condition.update_standards():
                 logging.info('Updating standard conditions from database')
