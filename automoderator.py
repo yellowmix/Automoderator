@@ -976,6 +976,12 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
 
     any_matched = False
     for condition in conditions:
+        # don't check remove/spam/report conditions on posts made by mods
+        if (condition.action in ('remove', 'spam', 'report') and
+                item.author and 
+                get_user_rank(item.author, item.subreddit) == 'moderator'):
+            continue
+                
         # never remove anything if it's been approved by another mod
         if (condition.action in ('remove', 'spam') and
                 item.approved_by and
