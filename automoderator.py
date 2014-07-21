@@ -323,7 +323,14 @@ class Condition(object):
                 elif attr == 'combined_karma':
                     value = user.link_karma + user.comment_karma
                 else:
-                    value = getattr(user, attr, 0)
+                    try:
+                        value = getattr(user, attr, 0)
+                    except HTTPError as e:
+                        if e.response.status_code == 404:
+                            # user is shadowbanned, never satisfies conditions
+                            return False
+                        else:
+                            raise
             else:
                 value = 0
                 
