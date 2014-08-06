@@ -1010,7 +1010,8 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
             start_time = time()
             match = condition.check_item(item)
             if match:
-                performed_actions.add(condition.action)
+                if condition.action:
+                    performed_actions.add(condition.action)
                 performed_yaml.add(condition.yaml)
 
             logging.debug('{0}\n  Result {1} in {2}'
