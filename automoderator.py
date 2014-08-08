@@ -115,14 +115,16 @@ class Condition(object):
         self.match_flags = {}
         match_fields = set()
         for key in [k for k in init
-                    if k in self._match_targets or '+' in k]:
+                    if k in self._match_targets or
+                       '+' in k or
+                       k.startswith('~')]:
             if isinstance(self.modifiers, dict):
                 modifiers = self.modifiers.get(key, [])
             else:
                 modifiers = self.modifiers
             self.match_patterns[key] = self.get_pattern(key, modifiers)
 
-            if 'inverse' in modifiers:
+            if 'inverse' in modifiers or key.startswith('~'):
                 self.match_success[key] = False
             else:
                 self.match_success[key] = True
@@ -132,7 +134,7 @@ class Condition(object):
             if 'case-sensitive' not in modifiers:
                 self.match_flags[key] |= re.IGNORECASE
 
-            for field in key.split('+'):
+            for field in key.lstrip('~').split('+'):
                 match_fields.add(field)
         
         # if type wasn't defined, set based on fields being matched against
@@ -169,6 +171,7 @@ class Condition(object):
                 match_mod = mod
                 break
         else:
+            subject = subject.lstrip('~')
             # handle subdomains for domain checks
             if subject == 'domain':
                 value_str = ur'(?:.*?\.)?' + value_str
@@ -226,7 +229,7 @@ class Condition(object):
         match = None
         approve_shadowbanned = False
         for subject in self.match_patterns:
-            sources = set(subject.split('+'))
+            sources = set(subject.lstrip('~').split('+'))
             for source in sources:
                 approve_shadowbanned = False
                 if source == 'user' and item.author:
@@ -628,6 +631,8 @@ def validate_keys(check):
                      Condition._defaults.keys() + 
                      ['standard', 'type'])
     for key in check:
+        key = key.lstrip('~')
+
         if key in valid_keys:
             continue
 
