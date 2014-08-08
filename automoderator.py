@@ -115,9 +115,7 @@ class Condition(object):
         self.match_flags = {}
         match_fields = set()
         for key in [k for k in init
-                    if k in self._match_targets or
-                       '+' in k or
-                       k.startswith('~')]:
+                    if self.trimmed_key(k) in self._match_targets or '+' in k]:
             if isinstance(self.modifiers, dict):
                 modifiers = self.modifiers.get(key, [])
             else:
@@ -134,7 +132,7 @@ class Condition(object):
             if 'case-sensitive' not in modifiers:
                 self.match_flags[key] |= re.IGNORECASE
 
-            for field in key.lstrip('~').split('+'):
+            for field in self.trimmed_key(key).split('+'):
                 match_fields.add(field)
         
         # if type wasn't defined, set based on fields being matched against
@@ -150,6 +148,10 @@ class Condition(object):
         if self.set_options and not isinstance(self.set_options, list):
             self.set_options = self.set_options.split()
 
+    def trimmed_key(self, key):
+        subjects = key.lstrip('~')
+        subjects = re.sub(r'#.+$', '', subjects)
+        return subjects
 
     def get_pattern(self, subject, modifiers):
         # cast to lists, so we're not splitting a single string
@@ -171,7 +173,7 @@ class Condition(object):
                 match_mod = mod
                 break
         else:
-            subject = subject.lstrip('~')
+            subject = self.trimmed_key(subject)
             # handle subdomains for domain checks
             if subject == 'domain':
                 value_str = ur'(?:.*?\.)?' + value_str
@@ -229,7 +231,7 @@ class Condition(object):
         match = None
         approve_shadowbanned = False
         for subject in self.match_patterns:
-            sources = set(subject.lstrip('~').split('+'))
+            sources = set(self.trimmed_key(subject).split('+'))
             for source in sources:
                 approve_shadowbanned = False
                 if source == 'user' and item.author:
@@ -632,6 +634,7 @@ def validate_keys(check):
                      ['standard', 'type'])
     for key in check:
         key = key.lstrip('~')
+        key = re.sub(r'#.+$', '', key)
 
         if key in valid_keys:
             continue
