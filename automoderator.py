@@ -187,6 +187,8 @@ class Condition(object):
         
         Returns True if the condition is satisfied, False otherwise.
         """
+        html_parser = HTMLParser.HTMLParser()
+
         # check number of reports if necessary
         if self.reports and item.num_reports < self.reports:
             return False
@@ -210,6 +212,7 @@ class Condition(object):
         else:
             body_string = item.body
         if self.ignore_blockquotes:
+            body_string = html_parser.unescape(body_string)
             body_string = '\n'.join(line for line in body_string.splitlines()
                                     if not line.startswith('>') and
                                     len(line) > 0)
@@ -227,7 +230,6 @@ class Condition(object):
             if self.body_max_length and len(body_text) > self.body_max_length:
                 return False
 
-        html_parser = HTMLParser.HTMLParser()
         match = None
         approve_shadowbanned = False
         for subject in self.match_patterns:
