@@ -21,6 +21,7 @@ class Condition(object):
                  'author_is_submitter': None,
                  'is_reply': None,
                  'ignore_blockquotes': False,
+                 'moderators_exempt': True,
                  'body_min_length': None,
                  'body_max_length': None,
                  'priority': 0,
@@ -576,6 +577,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'author_is_submitter', bool)
     validate_type(cond, 'is_reply', bool)
     validate_type(cond, 'ignore_blockquotes', bool)
+    validate_type(cond, 'moderators_exempt', bool)
     validate_type(cond, 'reports', int)
     validate_type(cond, 'priority', int)
     validate_type(cond, 'body_min_length', int)
@@ -987,7 +989,8 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
     any_matched = False
     for condition in conditions:
         # don't check remove/spam/report conditions on posts made by mods
-        if (condition.action in ('remove', 'spam', 'report') and
+        if (condition.moderators_exempt and
+                condition.action in ('remove', 'spam', 'report') and
                 item.author and 
                 get_user_rank(item.author, item.subreddit) == 'moderator'):
             continue
