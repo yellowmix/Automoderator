@@ -370,6 +370,8 @@ class Condition(object):
             item.approve()
         elif self.action == 'report':
             item.report()
+        elif self.action == 'ban':
+            item.subreddit.add_ban(item.author.name)
 
         # set thread options
         if self.set_options and isinstance(item, praw.objects.Submission):
@@ -580,7 +582,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'message_subject', basestring)
     validate_type(cond, 'set_options', (basestring, list))
 
-    validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report'))
+    validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report', 'ban'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
 
     validate_modifiers(cond)
@@ -977,7 +979,7 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
     any_matched = False
     for condition in conditions:
         # don't check remove/spam/report conditions on posts made by mods
-        if (condition.action in ('remove', 'spam', 'report') and
+        if (condition.action in ('remove', 'spam', 'report', 'ban') and
                 item.author and 
                 get_user_rank(item.author, item.subreddit) == 'moderator'):
             continue

@@ -80,6 +80,7 @@ class Log(Base):
                          'remove',
                          'spam',
                          'report',
+                         'ban', 
                          'link_flair',
                          'user_flair',
                          name='log_action'))
