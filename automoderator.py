@@ -566,6 +566,7 @@ def check_condition_valid(cond):
 
     validate_values_not_empty(cond)
 
+    validate_type(cond, 'standard', basestring)
     if 'standard' in cond:
         if not Condition.get_standard_condition(cond['standard']):
             raise ValueError('Invalid standard condition: `{0}`'
