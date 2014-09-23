@@ -31,6 +31,7 @@ class Condition(object):
                  'modmail_subject': 'AutoModerator notification',
                  'message': None,
                  'message_subject': 'AutoModerator notification',
+                 'report_reason': '',
                  'link_flair_text': '',
                  'link_flair_class': '',
                  'user_flair_text': '',
@@ -394,7 +395,12 @@ class Condition(object):
         elif self.action == 'approve':
             item.approve()
         elif self.action == 'report':
-            item.report()
+            if self.report_reason:
+                reason = replace_placeholders(self.report_reason, item, match)
+                reason = reason[:100]
+            else:
+                reason = None
+            item.report(reason)
 
         # set thread options
         if self.set_options and isinstance(item, praw.objects.Submission):
@@ -608,6 +614,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'modmail_subject', basestring)
     validate_type(cond, 'message', basestring)
     validate_type(cond, 'message_subject', basestring)
+    validate_type(cond, 'report_reason', basestring)
     validate_type(cond, 'set_options', (basestring, list))
     validate_type(cond, 'overwrite_user_flair', bool)
     validate_type(cond, 'link_flair_text', basestring)
