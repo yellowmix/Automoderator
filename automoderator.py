@@ -37,7 +37,8 @@ class Condition(object):
                  'user_flair_class': '',
                  'user_conditions': {},
                  'set_options': [],
-                 'modifiers': []}
+                 'modifiers': [],
+                 'overwrite_user_flair': False}
 
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
                       'media_user', 'media_title', 'media_description',
@@ -599,6 +600,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'message', basestring)
     validate_type(cond, 'message_subject', basestring)
     validate_type(cond, 'set_options', (basestring, list))
+    validate_type(cond, 'overwrite_user_flair', bool)
 
     validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
@@ -1028,7 +1030,8 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
                 (item.link_flair_text or item.link_flair_css_class)):
             continue
         if ((condition.user_flair_text or condition.user_flair_class) and
-                (item.author_flair_text or item.author_flair_css_class)):
+                (item.author_flair_text or item.author_flair_css_class) and
+                not condition.overwrite_user_flair):
             continue
 
         try:
