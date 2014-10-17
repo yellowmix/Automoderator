@@ -426,12 +426,14 @@ class Condition(object):
             message = self.build_message(self.modmail, item, match,
                                          permalink=True)
             subject = replace_placeholders(self.modmail_subject, item, match)
+            subject = subject[:100]
             r.send_message('/r/'+item.subreddit.display_name, subject, message)
 
         if self.message and item.author:
             message = self.build_message(self.message, item, match,
                                          disclaimer=True, permalink=True)
             subject = replace_placeholders(self.message_subject, item, match)
+            subject = subject[:100]
             r.send_message(item.author.name, subject, message)
 
         log_entry = Log()
