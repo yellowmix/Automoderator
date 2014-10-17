@@ -41,6 +41,7 @@ class Condition(object):
 
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
                       'media_user', 'media_title', 'media_description',
+                      'media_author_url',
                       'author_flair_text', 'author_flair_css_class',
                       'link_title', 'link_url']
     _match_modifiers = {'full-exact': u'^{0}$',
@@ -54,6 +55,7 @@ class Condition(object):
                           'domain': 'full-exact',
                           'url': 'includes',
                           'media_user': 'full-exact',
+                          'media_author_url': 'includes',
                           'author_flair_text': 'full-exact',
                           'author_flair_css_class': 'full-exact',
                           'link_url': 'includes'}
@@ -140,7 +142,8 @@ class Condition(object):
         if not getattr(self, 'type', None):
             if (len(match_fields) > 0 and 
                 all(f in ('title', 'domain', 'url',
-                           'media_user', 'media_title', 'media_description')
+                           'media_user', 'media_title', 'media_description',
+                           'media_author_url')
                      for f in match_fields)):
                 self.type = 'submission'
             else:
@@ -259,6 +262,8 @@ class Condition(object):
                             string = item.media['oembed']['title']
                         elif source == 'media_description':
                             string = item.media['oembed']['description']
+                        elif source == 'media_author_url':
+                            string = item.media['oembed']['author_url']
                     except KeyError:
                         string = ''
                 else:
@@ -864,7 +869,8 @@ def replace_placeholders(string, item, match):
     if getattr(item, 'media', None):
         oembed_mapping = {'{{media_user}}': 'author_name',
                           '{{media_title}}': 'title',
-                          '{{media_description}}': 'description'}
+                          '{{media_description}}': 'description',
+                          '{{media_author_url}}': 'author_url'}
         for placeholder, source in oembed_mapping.iteritems():
             if placeholder in string:
                 try:
