@@ -389,7 +389,7 @@ class Condition(object):
 
         # set thread options
         if self.set_options and isinstance(item, praw.objects.Submission):
-            if 'nsfw' in self.set_options:
+            if 'nsfw' in self.set_options and not item.over_18:
                 item.mark_as_nsfw()
             if 'contest' in self.set_options:
                 item.set_contest_mode(True)
