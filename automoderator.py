@@ -222,16 +222,19 @@ class Condition(object):
                                     len(line) > 0)
 
         # check body length restrictions if necessary
-        if self.body_min_length or self.body_max_length:
+        if (self.body_min_length is not None or
+                self.body_max_length is not None):
             # remove non-word chars on either end of the string
             pattern = re.compile(r'^\W+', re.UNICODE)
             body_text = pattern.sub('', body_string)
             pattern = re.compile(r'\W+$', re.UNICODE)
             body_text = pattern.sub('', body_text)
 
-            if self.body_min_length and len(body_text) < self.body_min_length:
+            if (self.body_min_length is not None and
+                    len(body_text) < self.body_min_length):
                 return False
-            if self.body_max_length and len(body_text) > self.body_max_length:
+            if (self.body_max_length is not None and
+                    len(body_text) > self.body_max_length):
                 return False
 
         match = None
