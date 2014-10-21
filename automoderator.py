@@ -463,6 +463,7 @@ class Condition(object):
         if permalink and '{{permalink}}' not in message:
             message = '{{permalink}}\n\n'+message
         message = replace_placeholders(message, item, match)
+        message = message[:10000]
 
         return message
 
