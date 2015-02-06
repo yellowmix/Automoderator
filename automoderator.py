@@ -806,6 +806,8 @@ def process_messages():
                 else:
                     sr_name = message.subject
 
+                sr_name = sr_name.strip()
+
                 if (sr_name.lower(), message.author.name) in update_srs:
                     continue
 
