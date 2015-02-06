@@ -42,7 +42,7 @@ class Condition(object):
 
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
                       'media_user', 'media_title', 'media_description',
-                      'media_author_url',
+                      'media_author_url', 'parent_comment_id',
                       'author_flair_text', 'author_flair_css_class',
                       'link_title', 'link_url']
     _match_modifiers = {'full-exact': u'^{0}$',
@@ -52,6 +52,7 @@ class Condition(object):
                         'starts-with': u'^{0}',
                         'ends-with': u'{0}$'}
     _modifier_defaults = {'link_id': 'full-exact',
+                          'parent_comment_id': 'full-exact',
                           'user': 'full-exact',
                           'domain': 'full-exact',
                           'url': 'includes',
@@ -251,6 +252,13 @@ class Condition(object):
                 elif source == 'link_id':
                     # trim off the 't3_'
                     string = getattr(item, 'link_id', '')[3:]
+                elif source == 'parent_comment_id':
+                    parent_id = getattr(item, 'parent_id', '')
+                    # make sure it's a comment, and trim off the 't1_'
+                    if parent_id.startswith('t1_'):
+                        string = parent_id[3:]
+                    else:
+                        string = ''
                 elif source == 'body':
                     string = body_string
                 elif (source == 'url' and
