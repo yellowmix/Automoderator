@@ -610,6 +610,10 @@ def check_condition_valid(cond):
     validate_type(cond, 'message_subject', basestring)
     validate_type(cond, 'set_options', (basestring, list))
     validate_type(cond, 'overwrite_user_flair', bool)
+    validate_type(cond, 'link_flair_text', basestring)
+    validate_type(cond, 'link_flair_class', basestring)
+    validate_type(cond, 'user_flair_text', basestring)
+    validate_type(cond, 'user_flair_class', basestring)
 
     validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
