@@ -872,9 +872,11 @@ def replace_placeholders(string, item, match):
     if isinstance(item, praw.objects.Comment):
         string = string.replace('{{body}}', item.body)
         string = string.replace('{{kind}}', 'comment')
+        string = string.replace('{{link_id}}', item.link_id.split('_')[1])
     else:
         string = string.replace('{{body}}', item.selftext)
         string = string.replace('{{kind}}', 'submission')
+        string = string.replace('{{link_id}}', item.id)
     string = string.replace('{{domain}}', getattr(item, 'domain', ''))
     string = string.replace('{{permalink}}', get_permalink(item))
     string = string.replace('{{subreddit}}', item.subreddit.display_name)
