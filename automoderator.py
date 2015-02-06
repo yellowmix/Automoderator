@@ -906,7 +906,10 @@ def replace_placeholders(string, item, match):
     # replace any {{match_##}} with the corresponding match groups
     string = re.sub(r'\{\{match-(\d+)\}\}', r'\\\1', string)
     if match:
-        string = match.expand(string)
+        try:
+            string = match.expand(string)
+        except IndexError:
+            pass
 
     return string
 
