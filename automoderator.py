@@ -28,7 +28,6 @@ class Condition(object):
                  'comment': None,
                  'modmail': None,
                  'modmail_subject': 'AutoModerator notification',
-                 'report_reason': '',
                  'message': None,
                  'message_subject': 'AutoModerator notification',
                  'link_flair_text': '',
@@ -370,12 +369,7 @@ class Condition(object):
         elif self.action == 'approve':
             item.approve()
         elif self.action == 'report':
-            if self.report_reason:
-                reason = replace_placeholders(self.report_reason, item, match)
-                reason = ("Automoderator: " + reason)[:100]
-            else:
-                reason = "Automoderator"
-            item.report(reason)
+            item.report()
         elif self.action == 'ban':
             item.subreddit.add_ban(item.author.name)
 
