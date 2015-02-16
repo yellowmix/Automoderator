@@ -21,6 +21,7 @@ class Condition(object):
                  'author_is_submitter': None,
                  'is_reply': None,
                  'ignore_blockquotes': False,
+                 'moderators_exempt': True,
                  'body_min_length': None,
                  'body_max_length': None,
                  'priority': 0,
@@ -30,16 +31,19 @@ class Condition(object):
                  'modmail_subject': 'AutoModerator notification',
                  'message': None,
                  'message_subject': 'AutoModerator notification',
+                 'report_reason': '',
                  'link_flair_text': '',
                  'link_flair_class': '',
                  'user_flair_text': '',
                  'user_flair_class': '',
                  'user_conditions': {},
                  'set_options': [],
-                 'modifiers': []}
+                 'modifiers': [],
+                 'overwrite_user_flair': False}
 
     _match_targets = ['link_id', 'user', 'title', 'domain', 'url', 'body',
                       'media_user', 'media_title', 'media_description',
+                      'media_author_url', 'parent_comment_id',
                       'author_flair_text', 'author_flair_css_class',
                       'link_title', 'link_url']
     _match_modifiers = {'full-exact': u'^{0}$',
@@ -49,10 +53,12 @@ class Condition(object):
                         'starts-with': u'^{0}',
                         'ends-with': u'{0}$'}
     _modifier_defaults = {'link_id': 'full-exact',
+                          'parent_comment_id': 'full-exact',
                           'user': 'full-exact',
                           'domain': 'full-exact',
                           'url': 'includes',
                           'media_user': 'full-exact',
+                          'media_author_url': 'includes',
                           'author_flair_text': 'full-exact',
                           'author_flair_css_class': 'full-exact',
                           'link_url': 'includes'}
@@ -115,14 +121,14 @@ class Condition(object):
         self.match_flags = {}
         match_fields = set()
         for key in [k for k in init
-                    if k in self._match_targets or '+' in k]:
+                    if self.trimmed_key(k) in self._match_targets or '+' in k]:
             if isinstance(self.modifiers, dict):
                 modifiers = self.modifiers.get(key, [])
             else:
                 modifiers = self.modifiers
             self.match_patterns[key] = self.get_pattern(key, modifiers)
 
-            if 'inverse' in modifiers:
+            if 'inverse' in modifiers or key.startswith('~'):
                 self.match_success[key] = False
             else:
                 self.match_success[key] = True
@@ -132,14 +138,15 @@ class Condition(object):
             if 'case-sensitive' not in modifiers:
                 self.match_flags[key] |= re.IGNORECASE
 
-            for field in key.split('+'):
+            for field in self.trimmed_key(key).split('+'):
                 match_fields.add(field)
         
         # if type wasn't defined, set based on fields being matched against
         if not getattr(self, 'type', None):
             if (len(match_fields) > 0 and 
                 all(f in ('title', 'domain', 'url',
-                           'media_user', 'media_title', 'media_description')
+                           'media_user', 'media_title', 'media_description',
+                           'media_author_url')
                      for f in match_fields)):
                 self.type = 'submission'
             else:
@@ -148,6 +155,10 @@ class Condition(object):
         if self.set_options and not isinstance(self.set_options, list):
             self.set_options = self.set_options.split()
 
+    def trimmed_key(self, key):
+        subjects = key.lstrip('~')
+        subjects = re.sub(r'#.+$', '', subjects)
+        return subjects
 
     def get_pattern(self, subject, modifiers):
         # cast to lists, so we're not splitting a single string
@@ -169,6 +180,7 @@ class Condition(object):
                 match_mod = mod
                 break
         else:
+            subject = self.trimmed_key(subject)
             # handle subdomains for domain checks
             if subject == 'domain':
                 value_str = ur'(?:.*?\.)?' + value_str
@@ -182,6 +194,8 @@ class Condition(object):
         
         Returns True if the condition is satisfied, False otherwise.
         """
+        html_parser = HTMLParser.HTMLParser()
+
         # check number of reports if necessary
         if self.reports and item.num_reports < self.reports:
             return False
@@ -205,28 +219,31 @@ class Condition(object):
         else:
             body_string = item.body
         if self.ignore_blockquotes:
+            body_string = html_parser.unescape(body_string)
             body_string = '\n'.join(line for line in body_string.splitlines()
                                     if not line.startswith('>') and
                                     len(line) > 0)
 
         # check body length restrictions if necessary
-        if self.body_min_length or self.body_max_length:
+        if (self.body_min_length is not None or
+                self.body_max_length is not None):
             # remove non-word chars on either end of the string
             pattern = re.compile(r'^\W+', re.UNICODE)
             body_text = pattern.sub('', body_string)
             pattern = re.compile(r'\W+$', re.UNICODE)
             body_text = pattern.sub('', body_text)
 
-            if self.body_min_length and len(body_text) < self.body_min_length:
+            if (self.body_min_length is not None and
+                    len(body_text) < self.body_min_length):
                 return False
-            if self.body_max_length and len(body_text) > self.body_max_length:
+            if (self.body_max_length is not None and
+                    len(body_text) > self.body_max_length):
                 return False
 
-        html_parser = HTMLParser.HTMLParser()
         match = None
         approve_shadowbanned = False
         for subject in self.match_patterns:
-            sources = set(subject.split('+'))
+            sources = set(self.trimmed_key(subject).split('+'))
             for source in sources:
                 approve_shadowbanned = False
                 if source == 'user' and item.author:
@@ -236,6 +253,13 @@ class Condition(object):
                 elif source == 'link_id':
                     # trim off the 't3_'
                     string = getattr(item, 'link_id', '')[3:]
+                elif source == 'parent_comment_id':
+                    parent_id = getattr(item, 'parent_id', '')
+                    # make sure it's a comment, and trim off the 't1_'
+                    if parent_id.startswith('t1_'):
+                        string = parent_id[3:]
+                    else:
+                        string = ''
                 elif source == 'body':
                     string = body_string
                 elif (source == 'url' and
@@ -251,6 +275,8 @@ class Condition(object):
                             string = item.media['oembed']['title']
                         elif source == 'media_description':
                             string = item.media['oembed']['description']
+                        elif source == 'media_author_url':
+                            string = item.media['oembed']['author_url']
                     except KeyError:
                         string = ''
                 else:
@@ -369,13 +395,18 @@ class Condition(object):
         elif self.action == 'approve':
             item.approve()
         elif self.action == 'report':
-            item.report()
+            if self.report_reason:
+                reason = replace_placeholders(self.report_reason, item, match)
+                reason = reason[:100]
+            else:
+                reason = None
+            item.report(reason)
         elif self.action == 'ban':
             item.subreddit.add_ban(item.author.name)
-
+            
         # set thread options
         if self.set_options and isinstance(item, praw.objects.Submission):
-            if 'nsfw' in self.set_options:
+            if 'nsfw' in self.set_options and not item.over_18:
                 item.mark_as_nsfw()
             if 'contest' in self.set_options:
                 item.set_contest_mode(True)
@@ -412,12 +443,14 @@ class Condition(object):
             message = self.build_message(self.modmail, item, match,
                                          permalink=True)
             subject = replace_placeholders(self.modmail_subject, item, match)
+            subject = subject[:100]
             r.send_message('/r/'+item.subreddit.display_name, subject, message)
 
         if self.message and item.author:
             message = self.build_message(self.message, item, match,
                                          disclaimer=True, permalink=True)
             subject = replace_placeholders(self.message_subject, item, match)
+            subject = subject[:100]
             r.send_message(item.author.name, subject, message)
 
         log_entry = Log()
@@ -446,6 +479,7 @@ class Condition(object):
         if permalink and '{{permalink}}' not in message:
             message = '{{permalink}}\n\n'+message
         message = replace_placeholders(message, item, match)
+        message = message[:10000]
 
         return message
 
@@ -560,6 +594,7 @@ def check_condition_valid(cond):
 
     validate_values_not_empty(cond)
 
+    validate_type(cond, 'standard', basestring)
     if 'standard' in cond:
         if not Condition.get_standard_condition(cond['standard']):
             raise ValueError('Invalid standard condition: `{0}`'
@@ -571,6 +606,7 @@ def check_condition_valid(cond):
     validate_type(cond, 'author_is_submitter', bool)
     validate_type(cond, 'is_reply', bool)
     validate_type(cond, 'ignore_blockquotes', bool)
+    validate_type(cond, 'moderators_exempt', bool)
     validate_type(cond, 'reports', int)
     validate_type(cond, 'priority', int)
     validate_type(cond, 'body_min_length', int)
@@ -580,7 +616,13 @@ def check_condition_valid(cond):
     validate_type(cond, 'modmail_subject', basestring)
     validate_type(cond, 'message', basestring)
     validate_type(cond, 'message_subject', basestring)
+    validate_type(cond, 'report_reason', basestring)
     validate_type(cond, 'set_options', (basestring, list))
+    validate_type(cond, 'overwrite_user_flair', bool)
+    validate_type(cond, 'link_flair_text', basestring)
+    validate_type(cond, 'link_flair_class', basestring)
+    validate_type(cond, 'user_flair_text', basestring)
+    validate_type(cond, 'user_flair_class', basestring)
 
     validate_value_in(cond, 'action', ('approve', 'remove', 'spam', 'report', 'ban'))
     validate_value_in(cond, 'type', ('submission', 'comment', 'both'))
@@ -630,6 +672,9 @@ def validate_keys(check):
                      Condition._defaults.keys() + 
                      ['standard', 'type'])
     for key in check:
+        key = key.lstrip('~')
+        key = re.sub(r'#.+$', '', key)
+
         if key in valid_keys:
             continue
 
@@ -770,6 +815,8 @@ def process_messages():
                 else:
                     sr_name = message.subject
 
+                sr_name = sr_name.strip()
+
                 if (sr_name.lower(), message.author.name) in update_srs:
                     continue
 
@@ -834,9 +881,11 @@ def replace_placeholders(string, item, match):
     if isinstance(item, praw.objects.Comment):
         string = string.replace('{{body}}', item.body)
         string = string.replace('{{kind}}', 'comment')
+        string = string.replace('{{link_id}}', item.link_id.split('_')[1])
     else:
         string = string.replace('{{body}}', item.selftext)
         string = string.replace('{{kind}}', 'submission')
+        string = string.replace('{{link_id}}', item.id)
     string = string.replace('{{domain}}', getattr(item, 'domain', ''))
     string = string.replace('{{permalink}}', get_permalink(item))
     string = string.replace('{{subreddit}}', item.subreddit.display_name)
@@ -853,7 +902,8 @@ def replace_placeholders(string, item, match):
     if getattr(item, 'media', None):
         oembed_mapping = {'{{media_user}}': 'author_name',
                           '{{media_title}}': 'title',
-                          '{{media_description}}': 'description'}
+                          '{{media_description}}': 'description',
+                          '{{media_author_url}}': 'author_url'}
         for placeholder, source in oembed_mapping.iteritems():
             if placeholder in string:
                 try:
@@ -865,7 +915,10 @@ def replace_placeholders(string, item, match):
     # replace any {{match_##}} with the corresponding match groups
     string = re.sub(r'\{\{match-(\d+)\}\}', r'\\\1', string)
     if match:
-        string = match.expand(string)
+        try:
+            string = match.expand(string)
+        except IndexError:
+            pass
 
     return string
 
@@ -979,7 +1032,8 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
     any_matched = False
     for condition in conditions:
         # don't check remove/spam/report conditions on posts made by mods
-        if (condition.action in ('remove', 'spam', 'report', 'ban') and
+        if (condition.moderators_exempt and
+                condition.action in ('remove', 'spam', 'report', 'ban') and
                 item.author and 
                 get_user_rank(item.author, item.subreddit) == 'moderator'):
             continue
@@ -1005,14 +1059,16 @@ def check_conditions(subreddit, item, conditions, stop_after_match=False):
                 (item.link_flair_text or item.link_flair_css_class)):
             continue
         if ((condition.user_flair_text or condition.user_flair_class) and
-                (item.author_flair_text or item.author_flair_css_class)):
+                (item.author_flair_text or item.author_flair_css_class) and
+                not condition.overwrite_user_flair):
             continue
 
         try:
             start_time = time()
             match = condition.check_item(item)
             if match:
-                performed_actions.add(condition.action)
+                if condition.action:
+                    performed_actions.add(condition.action)
                 performed_yaml.add(condition.yaml)
 
             logging.debug('{0}\n  Result {1} in {2}'
@@ -1147,7 +1203,7 @@ def build_multireddit_groups(subreddits):
     current_multi = []
     current_len = 0
     for sub in subreddits:
-        if current_len > 4700:
+        if current_len > 3300:
             multireddits.append(current_multi)
             current_multi = []
             current_len = 0
@@ -1163,7 +1219,8 @@ def check_queues(queue_funcs, sr_dict, cond_dict):
     global r
 
     for queue in queue_funcs:
-        subreddits = [s for s in sr_dict if len(cond_dict[s][queue]) > 0]
+        subreddits = [s for s in sr_dict
+                      if s in cond_dict and len(cond_dict[s][queue]) > 0]
         if len(subreddits) == 0:
             continue
 
